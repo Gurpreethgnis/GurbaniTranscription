@@ -288,6 +288,36 @@ Do NOT invent new libraries.
 
 ---
 
+## 🔟 PHASE COMPLETION CHECKLIST (MANDATORY)
+
+At the end of EVERY phase implementation, you MUST:
+
+1. **Run all tests** and verify they pass
+2. **Update README.md** with:
+   - New features added in the phase
+   - Updated project structure
+   - New dependencies
+   - Testing instructions
+3. **Commit and push code**:
+   ```bash
+   git add -A
+   git commit -m "Phase X: [Phase Name] - [Brief description]"
+   git push origin main
+   ```
+4. **Create completion documentation**:
+   - `PHASEX_COMPLETION_REPORT.md` - Implementation details
+   - `PHASEX_TEST_RESULTS.md` - Test results
+5. **Verify all rules compliance**:
+   - Type hints complete
+   - Logging integrated
+   - Tests created
+   - Configuration documented
+   - Error handling comprehensive
+
+**DO NOT proceed to next phase until all above are complete.**
+
+---
+
 ## 🚨 FINAL RULE
 
 If you are unsure:

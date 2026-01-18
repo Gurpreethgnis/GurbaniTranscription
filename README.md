@@ -1,9 +1,30 @@
-# Audio Transcription Application
+# Accuracy-First Katha Transcription System
 
-A web-based application for transcribing audio files using locally hosted Whisper models. Optimized for Punjabi, Urdu, and mixed-language audio files.
+A production-grade system for transcribing Katha (Sikh religious discourse) with maximum accuracy, featuring multi-ASR ensemble, canonical Gurbani quote detection, and intelligent fusion. Optimized for Punjabi, English, and mixed-language audio with Gurmukhi output.
 
 ## Features
 
+### Phase 1: Baseline Orchestrated Pipeline ✅
+- **VAD Chunking**: Voice Activity Detection with overlap buffers
+- **Language Identification**: Automatic routing (Punjabi/English/Scripture/Mixed)
+- **ASR-A (Whisper Large)**: Primary transcription engine with forced language per segment
+- **Structured Output**: JSON with segments, routes, confidence scores
+
+### Phase 2: Multi-ASR Ensemble + Fusion ✅
+- **ASR-B (Indic Whisper)**: Indic-tuned model for Punjabi/Hindi/Braj robustness
+- **ASR-C (English Whisper)**: English-optimized model for English segments
+- **Intelligent Fusion**: Voting, confidence merging, and re-decode policy
+- **Hybrid Execution**: ASR-A immediate, ASR-B/C parallel based on route
+- **Multi-Hypothesis Storage**: All ASR outputs preserved for review
+
+### Coming in Phase 3+
+- **Scripture Services**: SGGS + Dasam Granth database integration
+- **Quote Detection**: High-recall candidate detection
+- **Assisted Matching**: Fuzzy + semantic + verifier stages
+- **Canonical Replacement**: Exact bani text with metadata (Ang, Raag, author)
+- **Script Normalization**: Gurmukhi-first output with Roman transliteration
+
+### General Features
 - **Multi-file Processing**: Select and process multiple audio files
 - **Two Processing Modes**: 
   - One-by-one: Process files individually with manual control
@@ -13,7 +34,6 @@ A web-based application for transcribing audio files using locally hosted Whispe
   - JSON files with metadata (.json)
 - **Processing Log**: Track all processed files with timestamps and status
 - **Resume Support**: Skip already processed files automatically
-- **Language Detection**: Automatic detection of Punjabi, Urdu, and other languages
 - **Modern Web UI**: Clean, responsive interface
 
 ## Quick Start with Docker (Recommended)
@@ -74,6 +94,11 @@ The Docker setup automatically:
 3. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
+   ```
+   
+   **Phase 2 Dependencies** (for multi-ASR fusion):
+   ```bash
+   pip install rapidfuzz python-Levenshtein
    ```
 
 4. **Install PyTorch** (if not already installed):
@@ -139,27 +164,42 @@ Edit `config.py` to customize:
 
 ```
 KathaTranscription/
-├── app.py                 # Flask backend server
-├── whisper_service.py     # Whisper model wrapper
-├── file_manager.py        # File operations and logging
-├── config.py              # Configuration settings
-├── Dockerfile             # Docker configuration
-├── docker-compose.yml     # Docker Compose configuration
+├── app.py                          # Flask backend server
+├── orchestrator.py                 # Main pipeline orchestrator (Phase 1+2)
+├── vad_service.py                  # Voice Activity Detection
+├── langid_service.py               # Language/domain identification
+├── whisper_service.py              # Legacy Whisper service
+├── file_manager.py                 # File operations and logging
+├── config.py                       # Configuration settings
+├── models.py                       # Data models (Segment, ASRResult, etc.)
+├── errors.py                       # Custom exceptions
+├── asr/
+│   ├── __init__.py
+│   ├── asr_whisper.py              # ASR-A: Whisper Large
+│   ├── asr_indic.py                # ASR-B: Indic-tuned Whisper (Phase 2)
+│   ├── asr_english_fallback.py     # ASR-C: English Whisper (Phase 2)
+│   └── asr_fusion.py               # Fusion layer (Phase 2)
+├── Dockerfile                      # Docker configuration
+├── docker-compose.yml              # Docker Compose configuration
 ├── static/
 │   ├── css/
-│   │   └── style.css      # Application styles
+│   │   └── style.css               # Application styles
 │   └── js/
-│       └── main.js        # Frontend JavaScript
+│       └── main.js                 # Frontend JavaScript
 ├── templates/
-│   └── index.html         # Main UI
-├── uploads/               # Temporary upload directory
-├── outputs/               # Generated outputs
-│   ├── transcriptions/    # Text files
-│   └── json/             # JSON files
+│   └── index.html                  # Main UI
+├── uploads/                        # Temporary upload directory
+├── outputs/                        # Generated outputs
+│   ├── transcriptions/             # Text files
+│   └── json/                       # JSON files
 ├── logs/
-│   └── processed_files.json  # Processing log
-├── requirements.txt       # Python dependencies
-└── README.md             # This file
+│   └── processed_files.json        # Processing log
+├── requirements.txt                # Python dependencies
+├── test_phase1.py                  # Phase 1 test suite
+├── test_phase2.py                  # Phase 2 test suite
+├── PHASE2_COMPLETION_REPORT.md     # Phase 2 completion documentation
+├── PHASE2_TEST_RESULTS.md          # Phase 2 test results
+└── README.md                       # This file
 ```
 
 ## API Endpoints
@@ -167,10 +207,31 @@ KathaTranscription/
 - `GET /` - Main application page
 - `GET /status` - Server and model status
 - `POST /upload` - Upload audio file
-- `POST /transcribe` - Transcribe single file
+- `POST /transcribe` - Transcribe single file (legacy)
+- `POST /transcribe-v2` - Transcribe with Phase 2 multi-ASR ensemble
 - `POST /transcribe-batch` - Transcribe multiple files
 - `GET /log` - Get processing log
 - `GET /download/<filename>` - Download transcription file
+
+## Testing
+
+### Phase 1 Tests
+```bash
+python test_phase1.py
+```
+
+### Phase 2 Tests
+```bash
+python test_phase2.py
+```
+
+Tests include:
+- Module imports
+- Data model validation
+- Fusion service logic
+- ASR engine initialization
+- Orchestrator integration
+- End-to-end pipeline
 
 ## Output Files
 
@@ -277,9 +338,40 @@ docker-compose down -v
 
 This project is provided as-is for personal use.
 
+## Implementation Phases
+
+### Phase 1: Baseline Orchestrated Pipeline ✅
+- VAD chunking with overlap buffers
+- Language/domain identification
+- ASR-A (Whisper Large) with forced language
+- Structured segment output with confidence scores
+
+### Phase 2: Multi-ASR Ensemble + Fusion ✅
+- ASR-B (Indic-tuned Whisper) for Punjabi/Hindi/Braj
+- ASR-C (English Whisper) for English segments
+- Intelligent fusion with voting and confidence merging
+- Re-decode policy for low-confidence segments
+- Hybrid execution (ASR-A immediate, ASR-B/C parallel)
+
+### Phase 3: Scripture Services (Planned)
+- ShabadOS SGGS database integration
+- Dasam Granth database
+- Unified scripture service API
+
+### Phase 4: Quote Detection + Matching (Planned)
+- High-recall quote candidate detection
+- Assisted matching (fuzzy + semantic + verifier)
+- Canonical text replacement with metadata
+
+### Phase 5: Normalization + Transliteration (Planned)
+- Gurmukhi-first script normalization
+- Roman transliteration pipeline
+
 ## Notes
 
-- First run will download the Whisper model (can take a few minutes)
+- First run will download Whisper models (can take a few minutes)
 - Models are cached in `~/.cache/whisper/` (local) or Docker volume (Docker)
+- Phase 2 uses multiple ASR engines - may require more GPU memory
 - Large audio files may take significant time to process
-- Processing time depends on model size and hardware
+- Processing time depends on model size, number of ASR engines, and hardware
+- See `PHASE2_COMPLETION_REPORT.md` for Phase 2 implementation details

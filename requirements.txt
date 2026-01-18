@@ -1,0 +1,30 @@
+# Audio Transcription Application Dependencies
+
+# Web Framework
+flask>=3.0.0
+werkzeug>=3.0.0
+
+# Faster Whisper (uses CTranslate2 backend - faster and more stable)
+# This works independently of the PyTorch version for inference
+faster-whisper>=1.0.0
+
+# Requests (for health check in container)
+requests>=2.31.0
+
+# Audio processing - ffmpeg is required as a system dependency:
+# Windows: Download from https://ffmpeg.org/download.html
+# macOS: brew install ffmpeg
+# Linux: sudo apt-get install ffmpeg
+
+# Voice Activity Detection
+webrtcvad>=2.0.10
+
+# Audio manipulation for chunking
+pydub>=0.25.1
+audioop-lts>=0.2.2 ; python_version >= "3.13"  # Required for Python 3.13+ (audioop was removed)
+
+# Audio file handling
+soundfile>=0.12.0
+
+# NumPy for audio processing
+numpy>=1.24.0

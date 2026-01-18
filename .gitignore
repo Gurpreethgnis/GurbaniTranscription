@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Flask
+instance/
+.webassets-cache
+
+# Uploads and outputs (user data)
+uploads/*
+!uploads/.gitkeep
+outputs/transcriptions/*
+!outputs/transcriptions/.gitkeep
+outputs/json/*
+!outputs/json/.gitkeep
+logs/processed_files.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Whisper cache (models are large)
+.cache/
+~/.cache/whisper/
+
+# Temporary files
+*.tmp
+*.log

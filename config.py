@@ -47,12 +47,44 @@ LANGID_ENGLISH_THRESHOLD = 0.6  # Confidence threshold for English detection (0.
 # Segment confidence threshold
 SEGMENT_CONFIDENCE_THRESHOLD = 0.7  # Segments below this confidence will be flagged for review
 
+# Phase 2: Multi-ASR Configuration
+ASR_B_MODEL = "vasista22/whisper-hindi-large-v2"  # Indic-tuned model (HuggingFace identifier)
+ASR_B_FALLBACK_MODEL = "large-v3"  # Fallback if Indic model unavailable
+ASR_C_MODEL = "medium"  # English model (faster than large)
+ASR_C_FORCE_LANGUAGE = "en"  # Always force English for ASR-C
+
+# Fusion Configuration
+FUSION_AGREEMENT_THRESHOLD = 0.85  # Text similarity for "agreement" (0-1)
+FUSION_CONFIDENCE_BOOST = 0.1  # Boost when engines agree (0-1)
+FUSION_REDECODE_THRESHOLD = 0.6  # Trigger re-decode below this confidence (0-1)
+FUSION_MAX_REDECODE_ATTEMPTS = 2  # Maximum re-decode attempts per segment
+
+# Hybrid Execution
+ASR_PARALLEL_EXECUTION = True  # Run ASR-B/C in parallel
+ASR_TIMEOUT_SECONDS = 60  # Per-engine timeout in seconds
+
 # Server configuration
 # Use 0.0.0.0 for Docker, 127.0.0.1 for local development
 HOST = os.getenv("FLASK_HOST", "0.0.0.0")
 PORT = int(os.getenv("FLASK_PORT", "5000"))
 DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
 
+# Logging configuration
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOG_FILE_ENABLED = os.getenv("LOG_FILE_ENABLED", "true").lower() == "true"
+
 # Create directories if they don't exist
 for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
+
+# Setup logging
+import logging
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format=LOG_FORMAT,
+    handlers=[
+        logging.StreamHandler(),
+        *([logging.FileHandler(LOGS_DIR / "transcription.log")] if LOG_FILE_ENABLED else [])
+    ]
+)

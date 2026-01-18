@@ -28,3 +28,7 @@ soundfile>=0.12.0
 
 # NumPy for audio processing
 numpy>=1.24.0
+
+# Phase 2: Multi-ASR + Fusion
+rapidfuzz>=3.0.0              # Fast fuzzy string matching
+python-Levenshtein>=0.21.0    # Levenshtein distance for alignment

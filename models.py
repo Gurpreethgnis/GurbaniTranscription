@@ -68,6 +68,28 @@ class ASRResult:
 
 
 @dataclass
+class FusionResult:
+    """Result from ASR fusion layer."""
+    fused_text: str
+    fused_confidence: float
+    agreement_score: float  # How much engines agreed (0-1)
+    hypotheses: List[Dict[str, Any]]
+    redecode_attempts: int
+    selected_engine: str  # Which engine's text was primarily used
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "fused_text": self.fused_text,
+            "fused_confidence": self.fused_confidence,
+            "agreement_score": self.agreement_score,
+            "hypotheses": self.hypotheses,
+            "redecode_attempts": self.redecode_attempts,
+            "selected_engine": self.selected_engine
+        }
+
+
+@dataclass
 class ProcessedSegment:
     """A processed segment with routing and metadata."""
     start: float

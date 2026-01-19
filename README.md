@@ -297,6 +297,10 @@ KathaTranscription/
 │   └── pdf_exporter.py
 ├── static/                   # Web assets
 ├── templates/                # HTML templates
+├── tests/                    # Test suite
+│   ├── test_phase*.py        # Phase-specific tests
+│   ├── test_*.py             # Component tests
+│   └── __init__.py
 └── outputs/                  # Transcription outputs
 ```
 
@@ -307,26 +311,26 @@ KathaTranscription/
 ### Run All Tests
 
 ```bash
-python -m pytest test_*.py -v
+python -m pytest tests/ -v
 ```
 
 ### Component Tests
 
 ```bash
 # ASR engines
-python test_phase2.py
+python -m pytest tests/test_phase2.py -v
 
 # Script conversion
-python test_phase3.py
+python -m pytest tests/test_phase3.py -v
 
 # Quote detection
-python -m pytest test_phase4_*.py -v
+python -m pytest tests/test_phase4_*.py -v
 
 # Live mode
-python test_phase6.py
+python -m pytest tests/test_phase6.py -v
 
 # Audio denoising
-python -m pytest test_denoiser.py -v
+python -m pytest tests/test_denoiser.py -v
 ```
 
 ---

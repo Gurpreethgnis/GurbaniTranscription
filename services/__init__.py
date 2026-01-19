@@ -8,9 +8,7 @@ Contains:
 - script_converter: Script conversion utilities
 """
 
-from .whisper_service import get_whisper_service
-from .vad_service import VADService
-from .langid_service import LangIDService
-from .script_converter import ScriptConverter
+# Don't import here to avoid circular imports
+# Users should import directly: from services.vad_service import VADService
 
-__all__ = ['get_whisper_service', 'VADService', 'LangIDService', 'ScriptConverter']
+__all__ = []

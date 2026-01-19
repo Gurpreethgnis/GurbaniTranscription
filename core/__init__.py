@@ -7,8 +7,12 @@ Contains:
 - errors: Custom exceptions
 """
 
-from .orchestrator import Orchestrator
-from .models import *
-from .errors import *
+# Import only what's needed to avoid circular imports
+# Import models and errors directly (they don't have circular deps)
+from . import models
+from . import errors
 
-__all__ = ['Orchestrator'] + [name for name in dir() if not name.startswith('_')]
+# Don't import orchestrator here to avoid circular imports
+# Users should import directly: from core.orchestrator import Orchestrator
+
+__all__ = ['models', 'errors']

@@ -306,8 +306,8 @@ def _match_quotes(
 
 def generate_quote_report(
     metrics: Dict[str, Any],
-    examples: Optional[List[Dict[str, Any]]] = None,
-    output_path: Path
+    output_path: Path,
+    examples: Optional[List[Dict[str, Any]]] = None
 ) -> Path:
     """
     Generate quote accuracy report.

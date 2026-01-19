@@ -6,7 +6,7 @@ Contains:
 - audio_utils: Audio utility functions
 """
 
-from .denoiser import Denoiser
+from .denoiser import AudioDenoiser
 from .audio_utils import get_audio_duration
 
-__all__ = ['Denoiser', 'get_audio_duration']
+__all__ = ['AudioDenoiser', 'get_audio_duration']

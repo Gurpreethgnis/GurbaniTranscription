@@ -1,297 +1,236 @@
-# Accuracy-First Katha Transcription System
+# 🎙️ Accuracy-First Katha Transcription System
 
-A production-grade system for transcribing Katha (Sikh religious discourse) with maximum accuracy, featuring multi-ASR ensemble, canonical Gurbani quote detection, audio denoising, and intelligent fusion. Optimized for Punjabi, English, and mixed-language audio with Gurmukhi output.
+<div align="center">
 
-## Features
+![Status](https://img.shields.io/badge/status-production-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-personal%20use-lightgrey)
 
-### Phase 1: Baseline Orchestrated Pipeline ✅
-- **VAD Chunking**: Voice Activity Detection with overlap buffers
-- **Language Identification**: Automatic routing (Punjabi/English/Scripture/Mixed)
-- **ASR-A (Whisper Large)**: Primary transcription engine with forced language per segment
-- **Structured Output**: JSON with segments, routes, confidence scores
+**Multi-ASR Ensemble** | **Gurbani Detection** | **Live Mode** | **Script Conversion** | **Audio Denoising**
 
-### Phase 2: Multi-ASR Ensemble + Fusion ✅
-- **ASR-B (Indic Whisper)**: Indic-tuned model for Punjabi/Hindi/Braj robustness
-- **ASR-C (English Whisper)**: English-optimized model for English segments
-- **Intelligent Fusion**: Voting, confidence merging, and re-decode policy
-- **Hybrid Execution**: ASR-A immediate, ASR-B/C parallel based on route
-- **Multi-Hypothesis Storage**: All ASR outputs preserved for review
+[Quick Start](#-quick-start) • [Features](#-key-features) • [Installation](#-installation) • [API Docs](#-api-documentation) • [Troubleshooting](#-troubleshooting)
 
-### Phase 3: Script Conversion ✅
-- **Automatic Script Detection**: Detects Shahmukhi, Gurmukhi, English, Devanagari, or mixed
-- **Shahmukhi to Gurmukhi Conversion**: Converts Arabic-based Punjabi to Gurmukhi script
-- **Gurmukhi to Roman Transliteration**: Transliterates to Roman script (ISO 15919, IAST, or practical)
-- **Dual-Output Generation**: Produces both Gurmukhi and Roman transliteration
-- **Common Word Dictionary**: Uses dictionary lookup for accurate conversion
-- **Confidence Scoring**: Flags uncertain conversions for review
-- **Integrated Pipeline**: Automatically applied to all transcription segments
+</div>
 
-### Phase 4: Scripture Services + Quote Detection ✅
-- **Scripture Services**: ShabadOS SGGS + Dasam Granth database integration
-- **Unified Scripture API**: Single interface for all scripture sources
-- **Quote Candidate Detection**: High-recall detection using multiple signals
-- **Assisted Matching**: Multi-stage matching (fuzzy + semantic + verifier)
-- **Canonical Replacement**: Exact bani text with metadata (Ang, Raag, author)
-- **Provenance Preservation**: Original ASR text preserved alongside canonical
+---
 
-### Phase 5: Normalization + Transliteration Gap Filling ✅
-- **Gurmukhi Diacritic Normalization**: Tippi/Bindi, Adhak, Nukta normalization
-- **ShabadOS Transliteration Retrieval**: Roman transliteration from database for canonical quotes
-- **Consistent Unicode Normalization**: Applied throughout pipeline using config.UNICODE_NORMALIZATION_FORM
-- **Canonical Quote Transliteration**: Database transliteration flows through to final output
+## 📖 What is this?
 
-### Phase 6: Live Mode + WebSocket UI ✅
-- **WebSocket Server**: Flask-SocketIO integration for real-time communication
-- **Live Audio Streaming**: Browser microphone capture with MediaRecorder API
-- **Draft Captions**: Immediate ASR-A output (< 2s latency)
-- **Verified Updates**: Post-quote-detection updates (< 5s latency)
-- **Real-time Display**: Live transcript with Gurmukhi/Roman toggle
-- **Quote Highlighting**: Visual distinction with metadata tooltips
-- **Session Management**: Multi-session support with error handling
+A **production-grade automatic speech recognition (ASR) system** specifically designed for transcribing **Katha** (Sikh religious discourse) with maximum accuracy. This system combines multiple state-of-the-art ASR engines, intelligent fusion algorithms, and canonical Gurbani quote detection to produce highly accurate transcriptions in Gurmukhi script with Roman transliteration.
 
-### Phase 7: Audio Denoising Module ✅
-- **Multi-Backend Support**: Choose from noisereduce (default), Facebook denoiser, or DeepFilterNet
-- **Configurable Strength**: Light, medium, or aggressive noise reduction
-- **Batch Mode**: Full file denoising before VAD chunking
-- **Live Mode**: Real-time chunk-by-chunk denoising for streaming
-- **Auto-Enable**: Automatically enables when noise level exceeds threshold
-- **Opt-In Design**: Disabled by default, enable via environment variables
+**Perfect for:**
+- Transcribing Sikh religious lectures and discourses
+- Converting Punjabi audio (Gurmukhi/Shahmukhi) to text
+- Real-time live transcription with WebSocket support
+- Detecting and replacing Gurbani quotes with canonical text
+- Multi-language audio processing (Punjabi, Hindi, English, mixed)
 
-### Phase 8: Evaluation Harness ✅
-- **WER/CER Computation**: Word and Character Error Rate metrics using jiwer
-- **Ground Truth Management**: Store and manage reference transcriptions
-- **Accuracy Reports**: Generate detailed accuracy reports for testing
+---
 
-### General Features
-- **Multi-file Processing**: Select and process multiple audio files
-- **Two Processing Modes**: 
-  - One-by-one: Process files individually with manual control
-  - Batch: Process all files automatically
-- **Multiple Output Formats**: 
-  - Plain text files (.txt)
-  - JSON files with metadata (.json)
-- **Processing Log**: Track all processed files with timestamps and status
-- **Resume Support**: Skip already processed files automatically
-- **Modern Web UI**: Clean, responsive interface with theme support
+## ✨ Key Features
 
-## Quick Start with Docker (Recommended)
+### 🎯 Core Capabilities
 
-The easiest way to run the application is using Docker:
+- **Multi-ASR Ensemble**: Combines Whisper Large, Indic-tuned Whisper, and English Whisper for optimal accuracy
+- **Intelligent Fusion**: Voting algorithms and confidence merging across multiple ASR engines
+- **Canonical Gurbani Detection**: Automatically detects and replaces Gurbani quotes with exact canonical text from SGGS and Dasam Granth databases
+- **Script Conversion**: Automatic Shahmukhi → Gurmukhi conversion and Gurmukhi → Roman transliteration
+- **Live Transcription**: Real-time WebSocket-based transcription with <2s draft latency and <5s verified updates
+- **Audio Denoising**: Optional noise reduction for improved accuracy on noisy recordings
+- **Multi-Format Export**: Export transcriptions as TXT, JSON, Markdown, HTML, DOCX, or PDF
 
-1. **Make sure Docker and Docker Compose are installed**
+### 🌐 Language & Script Support
 
-2. **Build and run the container**:
-   ```bash
-   docker-compose up --build
-   ```
+- **Punjabi** (Gurmukhi & Shahmukhi scripts)
+- **Hindi** (Devanagari script)
+- **English**
+- **Mixed languages** (auto-detected and routed)
 
-3. **Open your browser** and navigate to:
-   ```
-   http://localhost:5000
-   ```
+### 🔧 Technical Features
 
-4. **To stop the container**:
-   ```bash
-   docker-compose down
-   ```
+- **Voice Activity Detection (VAD)**: Intelligent audio chunking with overlap buffers
+- **Language Identification**: Automatic routing based on detected language/domain
+- **Unicode Normalization**: Consistent Gurmukhi diacritic handling
+- **Semantic Search**: Optional embedding-based quote matching for improved recall
+- **Evaluation Tools**: WER/CER computation and accuracy reporting
 
-The Docker setup automatically:
-- Installs all dependencies
-- Sets up FFmpeg
-- Mounts volumes for uploads, outputs, and logs (data persists)
-- Caches Whisper models for faster restarts
-- Enables GPU acceleration (NVIDIA CUDA)
+---
 
-## Manual Installation (Without Docker)
+## 🚀 Quick Start
+
+### Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd KathaTranscription
+
+# Start the application
+docker-compose up --build
+
+# Open in browser
+# http://localhost:5000
+```
+
+The Docker setup automatically handles dependencies, FFmpeg, GPU acceleration, and model caching.
+
+### Manual Installation
+
+```bash
+# 1. Install Python 3.8+ and FFmpeg
+# Windows: Download FFmpeg from ffmpeg.org and add to PATH
+# macOS: brew install ffmpeg
+# Linux: sudo apt-get install ffmpeg
+
+# 2. Clone and setup
+git clone <repository-url>
+cd KathaTranscription
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Start server
+python app.py
+
+# 5. Open browser
+# http://127.0.0.1:5000
+```
+
+---
+
+## 📦 Installation
 
 ### Prerequisites
 
-1. **Python 3.8 or higher**
-2. **FFmpeg** (required for audio processing):
-   - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-   - **macOS**: `brew install ffmpeg`
-   - **Linux**: `sudo apt-get install ffmpeg`
+- **Python 3.8+**
+- **FFmpeg** (for audio processing)
+- **NVIDIA GPU** (optional, but recommended for faster processing)
+- **8GB+ RAM** (16GB recommended)
 
-### Installation Steps
+### Step-by-Step Setup
 
-1. **Clone or navigate to the project directory**:
+1. **Install FFmpeg**:
+   - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
+   - macOS: `brew install ffmpeg`
+   - Linux: `sudo apt-get install ffmpeg`
+
+2. **Clone Repository**:
    ```bash
+   git clone <repository-url>
    cd KathaTranscription
    ```
 
-2. **Create a virtual environment** (recommended):
+3. **Create Virtual Environment**:
    ```bash
    python -m venv venv
-   
-   # Windows
-   venv\Scripts\activate
-   
-   # macOS/Linux
-   source venv/bin/activate
+   source venv/bin/activate  # Windows: venv\Scripts\activate
    ```
 
-3. **Install Python dependencies**:
+4. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Install PyTorch** (if not already installed):
-   - For CPU only: `pip install torch`
-   - For GPU (CUDA): Visit [pytorch.org](https://pytorch.org/get-started/locally/) for installation instructions
+5. **Install PyTorch** (if not included):
+   - CPU: `pip install torch`
+   - GPU: Visit [pytorch.org](https://pytorch.org/get-started/locally/) for CUDA installation
 
-5. **Start the server**:
+6. **Start Server**:
    ```bash
    python app.py
    ```
 
-6. **Open your browser** and navigate to:
-   ```
-   http://127.0.0.1:5000
-   ```
+7. **Access Web UI**: Open `http://127.0.0.1:5000` in your browser
 
-## Configuration
+---
 
-Edit `config.py` or set environment variables to customize:
-
-### Core Settings
-- **Model Size**: Change `WHISPER_MODEL_SIZE` (options: `tiny`, `base`, `small`, `medium`, `large`)
-- **Language Hints**: Modify `LANGUAGE_HINTS` for better detection
-- **File Size Limit**: Adjust `MAX_FILE_SIZE_MB`
-- **Server Port**: Change `PORT` or set `FLASK_PORT` environment variable
-
-### Audio Denoising (Phase 7)
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENABLE_DENOISING` | `false` | Enable denoising for batch mode |
-| `LIVE_DENOISE_ENABLED` | `false` | Enable denoising for live mode |
-| `DENOISE_STRENGTH` | `medium` | Strength: `light`, `medium`, `aggressive` |
-| `DENOISE_BACKEND` | `noisereduce` | Backend: `noisereduce`, `facebook`, `deepfilter` |
-| `DENOISE_SAMPLE_RATE` | `16000` | Target sample rate (Hz) |
-| `DENOISE_AUTO_ENABLE_THRESHOLD` | `0.4` | Auto-enable if noise level > threshold |
-
-**Enable denoising for noisy recordings:**
-```bash
-export ENABLE_DENOISING=true
-export DENOISE_STRENGTH=medium
-```
-
-## Usage
+## 💻 Usage
 
 ### File Transcription Mode
 
-1. **Select audio files**:
-   - Click the upload area or drag and drop files
+1. **Upload Audio Files**: Drag and drop or click to select files
    - Supported formats: MP3, WAV, M4A, FLAC, OGG, WebM, MP4, AVI, MOV
 
-2. **Choose processing mode**:
-   - **One by One**: Process files individually
-   - **Batch Process**: Process all files automatically
+2. **Choose Processing Mode**:
+   - **One-by-One**: Process files individually with manual control
+   - **Batch**: Process all files automatically
 
-3. **Process files**:
-   - Click "Process" on individual files (one-by-one mode)
-   - Click "Process All" button (batch mode)
-
-4. **View results**:
-   - Click "View" to see transcription in the browser
-   - Click "Download" to save text or JSON files
+3. **Process & Download**:
+   - Click "Process" to transcribe
+   - View results in browser or download as TXT/JSON
+   - Export in multiple formats (Markdown, HTML, DOCX, PDF)
 
 ### Live Transcription Mode
 
-1. **Navigate to** `/live` endpoint
-2. **Click "Start Recording"** to begin microphone capture
-3. **View real-time transcription** with draft and verified updates
-4. **Toggle display mode** between Gurmukhi, Roman, or Both
+1. Navigate to `/live` endpoint
+2. Click "Start Recording" to begin microphone capture
+3. View real-time transcription with:
+   - Draft captions (<2s latency)
+   - Verified updates (<5s latency)
+   - Gurmukhi/Roman toggle
+   - Quote highlighting with metadata
 
-## Project Structure
+---
 
-```
-KathaTranscription/
-├── app.py                          # Flask backend server
-├── orchestrator.py                 # Main pipeline orchestrator
-├── vad_service.py                  # Voice Activity Detection
-├── langid_service.py               # Language/domain identification
-├── whisper_service.py              # Legacy Whisper service
-├── script_converter.py             # Script conversion service
-├── file_manager.py                 # File operations and logging
-├── config.py                       # Configuration settings
-├── models.py                       # Data models (Segment, ASRResult, etc.)
-├── errors.py                       # Custom exceptions
-├── data/
-│   ├── __init__.py
-│   ├── script_mappings.py          # Unicode mapping tables
-│   ├── gurmukhi_normalizer.py      # Gurmukhi diacritic normalization
-│   └── vectors/                    # Embedding index files
-├── asr/
-│   ├── __init__.py
-│   ├── asr_whisper.py              # ASR-A: Whisper Large
-│   ├── asr_indic.py                # ASR-B: Indic-tuned Whisper
-│   ├── asr_english_fallback.py     # ASR-C: English Whisper
-│   └── asr_fusion.py               # Fusion layer
-├── audio/
-│   ├── __init__.py
-│   └── denoiser.py                 # Audio denoising service (Phase 7)
-├── quotes/
-│   ├── __init__.py
-│   ├── quote_candidates.py         # Quote candidate detection
-│   ├── assisted_matcher.py         # Multi-stage matching
-│   └── canonical_replacer.py       # Canonical text replacement
-├── scripture/
-│   ├── __init__.py
-│   ├── sggs_db.py                  # SGGS database interface
-│   ├── dasam_db.py                 # Dasam Granth database
-│   ├── scripture_service.py        # Unified scripture API
-│   ├── embedding_index.py          # Semantic search embeddings
-│   └── gurmukhi_to_ascii.py        # Script conversion utilities
-├── post/
-│   ├── __init__.py
-│   ├── annotator.py                # Transcript annotation
-│   └── transcript_merger.py        # Transcript merging utilities
-├── eval/
-│   ├── __init__.py
-│   ├── dataset_builder.py          # Evaluation dataset creation
-│   ├── wer_cer_reports.py          # WER/CER accuracy reports
-│   ├── quote_accuracy_reports.py   # Quote detection accuracy
-│   ├── ground_truth/               # Reference transcriptions
-│   └── reports/                    # Generated evaluation reports
-├── ui/
-│   ├── __init__.py
-│   └── websocket_server.py         # WebSocket server (Phase 6)
-├── static/
-│   ├── css/
-│   │   ├── style.css               # Main application styles
-│   │   └── themes.css              # Theme support
-│   └── js/
-│       ├── main.js                 # Main frontend JavaScript
-│       ├── live.js                 # Live mode JavaScript
-│       └── navigation.js           # Navigation utilities
-├── templates/
-│   ├── base.html                   # Base template
-│   ├── index.html                  # Main UI
-│   └── live.html                   # Live transcription UI
-├── uploads/                        # Temporary upload directory
-├── outputs/
-│   ├── transcriptions/             # Text files
-│   └── json/                       # JSON files
-├── logs/
-│   └── processed_files.json        # Processing log
-├── Dockerfile                      # Docker configuration
-├── docker-compose.yml              # Docker Compose configuration
-├── requirements.txt                # Python dependencies
-└── README.md                       # This file
+## ⚙️ Configuration
+
+Edit `config.py` or set environment variables:
+
+### Core Settings
+
+| Setting | Environment Variable | Default | Description |
+|---------|---------------------|---------|-------------|
+| Model Size | `WHISPER_MODEL_SIZE` | `large` | Options: `tiny`, `base`, `small`, `medium`, `large` |
+| Server Port | `FLASK_PORT` | `5000` | Flask server port |
+| Max File Size | `MAX_FILE_SIZE_MB` | `500` | Maximum upload size (MB) |
+
+### Audio Denoising
+
+Enable denoising for noisy recordings:
+
+```bash
+export ENABLE_DENOISING=true
+export DENOISE_STRENGTH=medium  # light, medium, aggressive
+export DENOISE_BACKEND=noisereduce  # noisereduce, facebook, deepfilter
 ```
 
-## API Endpoints
+### Quote Detection
 
-### REST API
-- `GET /` - Main application page
-- `GET /live` - Live transcription page
-- `GET /status` - Server and model status
-- `POST /upload` - Upload audio file
-- `POST /transcribe` - Transcribe single file (legacy)
-- `POST /transcribe-v2` - Transcribe with multi-ASR ensemble
-- `POST /transcribe-batch` - Transcribe multiple files
-- `GET /log` - Get processing log
-- `GET /download/<filename>` - Download transcription file
+Adjust quote matching sensitivity:
+
+```bash
+export QUOTE_MATCH_CONFIDENCE_THRESHOLD=0.90  # 0.0-1.0
+export USE_EMBEDDING_SEARCH=false  # Enable semantic search
+```
+
+### Full Configuration
+
+See `config.py` for all available settings including:
+- VAD (Voice Activity Detection) parameters
+- Language identification thresholds
+- ASR fusion settings
+- Script conversion options
+- Unicode normalization
+
+---
+
+## 📡 API Documentation
+
+### REST Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Main application page |
+| `GET` | `/live` | Live transcription page |
+| `GET` | `/status` | Server and model status |
+| `POST` | `/upload` | Upload audio file |
+| `POST` | `/transcribe-v2` | Transcribe with multi-ASR ensemble |
+| `POST` | `/transcribe-batch` | Transcribe multiple files |
+| `GET` | `/log` | Get processing log |
+| `GET` | `/download/<filename>` | Download transcription file |
+| `GET` | `/export/<filename>/<format>` | Export in format (txt, json, markdown, html, docx, pdf) |
 
 ### WebSocket Events
 
@@ -304,145 +243,227 @@ KathaTranscription/
 - `draft_caption` - Draft transcription (ASR-A output)
 - `verified_update` - Verified transcription (after quote detection)
 - `error` - Error message
-- `chunk_received` - Audio chunk acknowledgment
 
-## Testing
+### Example API Usage
+
+```python
+import requests
+
+# Upload file
+with open('audio.mp3', 'rb') as f:
+    response = requests.post('http://localhost:5000/upload', files={'file': f})
+    data = response.json()
+    filename = data['filename']
+
+# Transcribe
+response = requests.post('http://localhost:5000/transcribe-v2', 
+                          json={'filename': filename})
+result = response.json()
+
+# Download transcription
+response = requests.get(f'http://localhost:5000/download/{filename}.txt')
+```
+
+---
+
+## 🏗️ Project Structure
+
+```
+KathaTranscription/
+├── app.py                    # Flask backend server
+├── orchestrator.py           # Main pipeline orchestrator
+├── config.py                 # Configuration settings
+├── models.py                 # Data models
+├── asr/                      # ASR engines
+│   ├── asr_whisper.py        # ASR-A: Whisper Large
+│   ├── asr_indic.py          # ASR-B: Indic-tuned Whisper
+│   ├── asr_english_fallback.py  # ASR-C: English Whisper
+│   └── asr_fusion.py         # Fusion layer
+├── audio/                    # Audio processing
+│   └── denoiser.py           # Audio denoising
+├── quotes/                   # Quote detection
+│   ├── quote_candidates.py   # Candidate detection
+│   ├── assisted_matcher.py  # Multi-stage matching
+│   └── canonical_replacer.py # Canonical replacement
+├── scripture/                # Scripture databases
+│   ├── sggs_db.py           # SGGS database
+│   ├── dasam_db.py          # Dasam Granth database
+│   └── embedding_index.py   # Semantic search
+├── exports/                  # Export formats
+│   ├── json_exporter.py
+│   ├── markdown_exporter.py
+│   ├── html_exporter.py
+│   ├── docx_exporter.py
+│   └── pdf_exporter.py
+├── static/                   # Web assets
+├── templates/                # HTML templates
+└── outputs/                  # Transcription outputs
+```
+
+---
+
+## 🧪 Testing
 
 ### Run All Tests
+
 ```bash
 python -m pytest test_*.py -v
 ```
 
-### Phase-Specific Tests
-```bash
-# Phase 1: Baseline Pipeline
-python test_phase1.py
+### Component Tests
 
-# Phase 2: Multi-ASR Fusion
+```bash
+# ASR engines
 python test_phase2.py
 
-# Phase 3: Script Conversion
+# Script conversion
 python test_phase3.py
 
-# Phase 4: Scripture + Quote Detection
+# Quote detection
 python -m pytest test_phase4_*.py -v
 
-# Phase 5: Normalization
-python test_phase5.py
-
-# Phase 6: Live Mode
+# Live mode
 python test_phase6.py
 
-# Phase 7: Audio Denoising
+# Audio denoising
 python -m pytest test_denoiser.py -v
-
-# Phase 8: Evaluation
-python test_eval.py
 ```
 
-## Output Files
+---
 
-### Text Files (`outputs/transcriptions/`)
-Plain text files containing the transcription.
-
-### JSON Files (`outputs/json/`)
-Structured data with:
-- `filename`: Original filename
-- `transcription`: Object with `gurmukhi` and `roman` fields
-- `timestamp`: Processing timestamp
-- `segments`: Array of segments, each with:
-  - `text`: Gurmukhi text
-  - `gurmukhi`: Gurmukhi representation
-  - `roman`: Roman transliteration
-  - `original_script`: Detected original script
-  - `script_confidence`: Conversion confidence
-  - `start`, `end`: Timestamps
-  - `confidence`: ASR confidence
-  - `language`: Detected language
-  - `is_quote`: Whether segment is a detected quote
-  - `quote_metadata`: Quote info (Ang, Raag, Author) if applicable
-- `metadata`: Language, segments, etc.
-
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Docker Issues
 
 **Container won't start:**
-- Check Docker is running: `docker ps`
-- Check logs: `docker-compose logs`
-- Ensure port 5000 is not in use
+```bash
+docker ps  # Check Docker is running
+docker-compose logs  # Check logs
+```
 
 **GPU not detected:**
 - Ensure NVIDIA drivers are installed
 - Install NVIDIA Container Toolkit
-- Check GPU access: `docker run --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi`
+- Verify: `docker run --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi`
 
-**Model download issues:**
-- First run downloads the model (can take time)
-- Models are cached in Docker volume `whisper-cache`
+### Audio Processing
 
-### Audio Processing Errors
-- Verify FFmpeg is installed and in PATH
+**FFmpeg errors:**
+- Verify FFmpeg is installed: `ffmpeg -version`
+- Ensure FFmpeg is in PATH
 - Check audio file format is supported
-- Ensure file is not corrupted
 
-### Performance Tips
-1. **Use GPU**: Significantly faster than CPU-only
-2. **Enable Denoising**: For noisy recordings, enable denoising for better accuracy
-3. **Model Size**: Balance between speed and accuracy
-   - For quick processing: `tiny` or `base`
-   - For better accuracy: `small` or `medium` or `large`
+**Processing errors:**
+- Verify file is not corrupted
+- Check file size is within limits (default: 500MB)
+- Ensure sufficient disk space
 
-## Docker Commands
+### Performance
 
-```bash
-# Build and start
-docker-compose up --build
+**Slow processing:**
+- Use GPU acceleration (NVIDIA CUDA)
+- Reduce model size for faster processing (`small` or `medium`)
+- Enable parallel processing: `ASR_PARALLEL_WORKERS=2`
 
-# Start in background
-docker-compose up -d
+**Memory issues:**
+- Reduce model size
+- Process smaller audio chunks
+- Increase system RAM
 
-# View logs
-docker-compose logs -f
+### Model Download
 
-# Stop
-docker-compose down
+**First run downloads models:**
+- Initial download can take 5-10 minutes
+- Models are cached in `~/.cache/whisper/`
+- Docker: Models cached in volume `whisper-cache`
 
-# Rebuild after code changes
-docker-compose up --build
+---
 
-# Remove volumes (clears cached models)
-docker-compose down -v
-```
+## 📊 Output Formats
 
-## Implementation Phases
+### Text Files (`outputs/transcriptions/`)
+Plain text transcriptions in Gurmukhi script.
 
-| Phase | Feature | Status |
-|-------|---------|--------|
-| 1 | Baseline Orchestrated Pipeline | ✅ Complete |
-| 2 | Multi-ASR Ensemble + Fusion | ✅ Complete |
-| 3 | Script Conversion | ✅ Complete |
-| 4 | Scripture Services + Quote Detection | ✅ Complete |
-| 5 | Normalization + Transliteration | ✅ Complete |
-| 6 | Live Mode + WebSocket UI | ✅ Complete |
-| 7 | Audio Denoising Module | ✅ Complete |
-| 8 | Evaluation Harness | ✅ Complete |
+### JSON Files (`outputs/json/`)
+Structured data with:
+- Full transcription (Gurmukhi and Roman)
+- Segments with timestamps
+- Language detection results
+- Quote metadata (Ang, Raag, Author)
+- Confidence scores
+- Processing metrics
 
-## Language Support
+### Formatted Exports
+- **Markdown**: Clean, readable format
+- **HTML**: Styled with embedded CSS
+- **DOCX**: Microsoft Word documents
+- **PDF**: Professional PDF output
 
-Optimized for:
-- **Punjabi** (pa) - Gurmukhi and Shahmukhi scripts
-- **Hindi** (hi) - Devanagari script
-- **English** (en)
-- **Mixed languages** (auto-detected)
+---
 
-## License
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+---
+
+## 🔑 Keywords & Topics
+
+This project is optimized for discovery by search engines and AI tools. Key terms:
+
+**Primary Keywords:**
+- Punjabi transcription
+- Gurmukhi ASR
+- Sikh katha transcription
+- Gurbani detection
+- Multi-language speech recognition
+- Indic ASR
+- Shahmukhi to Gurmukhi conversion
+- Real-time transcription
+- WebSocket transcription
+- Whisper transcription
+- Canonical quote matching
+
+**GitHub Topics:**
+`punjabi` `gurmukhi` `asr` `speech-recognition` `whisper` `transcription` `sikh` `katha` `gurbani` `indic-languages` `multilingual` `websocket` `real-time` `audio-processing` `script-conversion` `shahmukhi` `devanagari` `audio-denoiser` `flask` `python`
+
+**Technical Stack:**
+- Python 3.8+
+- Flask & Flask-SocketIO
+- OpenAI Whisper (Large, Indic-tuned, English)
+- PyTorch
+- FAISS (semantic search)
+- FFmpeg
+- Docker
+
+---
+
+## 📝 License
 
 This project is provided as-is for personal use.
 
-## Notes
+---
 
-- First run will download Whisper models (can take a few minutes)
-- Models are cached in `~/.cache/whisper/` (local) or Docker volume (Docker)
-- Large audio files may take significant time to process
-- See individual `PHASE*_COMPLETION_REPORT.md` files for detailed implementation documentation
+## 📌 Notes
+
+- **First run**: Downloads Whisper models (5-10 minutes, one-time)
+- **Model caching**: Models cached locally or in Docker volume
+- **Processing time**: Varies by file size and model (typically 0.5-2x realtime with GPU)
+- **GPU recommended**: Significantly faster than CPU-only processing
+- **Database files**: SGGS and Dasam Granth databases required for quote detection (not included)
+
+---
+
+<div align="center">
+
+**Built with ❤️ for the Sikh community**
+
+[Report Issue](https://github.com/your-repo/issues) • [Request Feature](https://github.com/your-repo/issues) • [Documentation](#-api-documentation)
+
+</div>

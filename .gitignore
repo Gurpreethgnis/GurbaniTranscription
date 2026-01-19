@@ -50,3 +50,10 @@ data/vectors/
 
 # Stray pip version files
 =*
+
+# Phase documentation files (planning artifacts)
+PHASE*_COMPLETION_REPORT.md
+PHASE*_TEST_RESULTS.md
+PHASE*_IMPLEMENTATION_PLAN.md
+PHASE*_VERIFICATION.md
+PHASE*_TESTING_GUIDE.md

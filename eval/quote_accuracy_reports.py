@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import json
 from datetime import datetime
 
-from models import TranscriptionResult, ProcessedSegment, QuoteMatch
+from core.models import TranscriptionResult, ProcessedSegment, QuoteMatch
 
 logger = logging.getLogger(__name__)
 

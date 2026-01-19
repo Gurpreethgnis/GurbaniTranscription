@@ -8,8 +8,8 @@ from scripture.scripture_service import ScriptureService
 from quotes.quote_candidates import QuoteCandidateDetector
 from quotes.assisted_matcher import AssistedMatcher
 from quotes.canonical_replacer import CanonicalReplacer
-from models import ProcessedSegment
-from langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
+from core.models import ProcessedSegment
+from services.langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
 
 
 def test_real_database_search():

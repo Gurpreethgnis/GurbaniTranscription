@@ -109,3 +109,28 @@ class AudioDenoiseError(TranscriptionError):
         super().__init__(message)
         self.backend = backend
         self.reason = reason
+
+
+class DocumentFormatError(TranscriptionError):
+    """Raised when document formatting fails."""
+    
+    def __init__(self, reason: str = ""):
+        message = "Document formatting failed"
+        if reason:
+            message += f": {reason}"
+        message += "\nFix: Check that transcription result is valid and contains required segments"
+        super().__init__(message)
+        self.reason = reason
+
+
+class ExportError(TranscriptionError):
+    """Raised when document export fails."""
+    
+    def __init__(self, format: str, reason: str = ""):
+        message = f"Document export failed (format: {format})"
+        if reason:
+            message += f": {reason}"
+        message += f"\nFix: Check that {format} exporter is properly configured and dependencies are installed"
+        super().__init__(message)
+        self.format = format
+        self.reason = reason

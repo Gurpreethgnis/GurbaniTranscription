@@ -11,7 +11,7 @@ import sqlite3
 from pathlib import Path
 from data.gurmukhi_normalizer import GurmukhiNormalizer
 from scripture.sggs_db import SGGSDatabase
-from script_converter import ScriptConverter
+from services.script_converter import ScriptConverter
 from quotes.assisted_matcher import AssistedMatcher
 import config
 

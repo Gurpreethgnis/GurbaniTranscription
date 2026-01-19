@@ -4,7 +4,7 @@ Test suite for Phase 3, Milestone 3.5: Gurmukhi to Roman Transliterator
 Tests the GurmukhiToRomanTransliterator class.
 """
 import pytest
-from script_converter import GurmukhiToRomanTransliterator
+from services.script_converter import GurmukhiToRomanTransliterator
 
 
 class TestGurmukhiToRomanTransliterator:

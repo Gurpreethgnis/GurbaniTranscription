@@ -18,6 +18,14 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
     python3-pip \
+    # WeasyPrint dependencies
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz0b \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libffi-dev \
+    shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -41,7 +49,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads outputs/transcriptions outputs/json logs
+RUN mkdir -p uploads outputs/transcriptions outputs/json outputs/formatted logs
 
 # Expose port
 EXPOSE 5000

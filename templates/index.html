@@ -35,6 +35,99 @@
         </div>
     </section>
 
+    <!-- Advanced Processing Options -->
+    <section class="advanced-options-section">
+        <div class="section-header">
+            <h2>Advanced Processing Options</h2>
+            <button id="toggleOptionsBtn" class="btn-toggle" aria-expanded="false">
+                <span class="toggle-icon">▼</span>
+                <span class="toggle-text">Show Options</span>
+            </button>
+        </div>
+        <div id="advancedOptionsPanel" class="advanced-options-panel" style="display: none;">
+            <div class="options-grid">
+                <!-- Denoising Options -->
+                <div class="options-group">
+                    <h3>Audio Denoising</h3>
+                    <div class="option-item">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="denoiseEnabled" name="denoiseEnabled">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Enable Denoising</span>
+                        </label>
+                    </div>
+                    <div class="option-item">
+                        <label for="denoiseBackend">Denoising Backend:</label>
+                        <select id="denoiseBackend" name="denoiseBackend" class="option-select">
+                            <option value="noisereduce">NoiseReduce (Default)</option>
+                            <option value="facebook">Facebook Denoiser</option>
+                            <option value="deepfilter">DeepFilterNet</option>
+                        </select>
+                    </div>
+                    <div class="option-item">
+                        <label for="denoiseStrength">Denoising Strength:</label>
+                        <select id="denoiseStrength" name="denoiseStrength" class="option-select">
+                            <option value="light">Light</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="aggressive">Aggressive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Segment Processing Options -->
+                <div class="options-group">
+                    <h3>Segment Processing</h3>
+                    <div class="option-item">
+                        <label for="vadAggressiveness">VAD Aggressiveness: <span id="vadAggressivenessValue">2</span></label>
+                        <input type="range" id="vadAggressiveness" name="vadAggressiveness" min="0" max="3" value="2" step="1" class="option-slider">
+                        <div class="slider-labels">
+                            <span>0 (Least)</span>
+                            <span>3 (Most)</span>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <label for="vadMinChunkDuration">Min Chunk Duration (seconds):</label>
+                        <input type="number" id="vadMinChunkDuration" name="vadMinChunkDuration" min="0.5" max="5.0" step="0.5" value="1.0" class="option-input">
+                    </div>
+                    <div class="option-item">
+                        <label for="vadMaxChunkDuration">Max Chunk Duration (seconds):</label>
+                        <input type="number" id="vadMaxChunkDuration" name="vadMaxChunkDuration" min="10" max="60" step="5" value="30.0" class="option-input">
+                    </div>
+                    <div class="option-item">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="segmentRetryEnabled" name="segmentRetryEnabled" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Retry Empty Segments</span>
+                        </label>
+                    </div>
+                    <div class="option-item">
+                        <label for="maxSegmentRetries">Max Retry Attempts:</label>
+                        <input type="number" id="maxSegmentRetries" name="maxSegmentRetries" min="0" max="5" step="1" value="2" class="option-input">
+                    </div>
+                </div>
+
+                <!-- Processing Options -->
+                <div class="options-group">
+                    <h3>Processing Performance</h3>
+                    <div class="option-item">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="parallelProcessingEnabled" name="parallelProcessingEnabled" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Enable Parallel ASR Processing</span>
+                        </label>
+                    </div>
+                    <div class="option-item">
+                        <label for="parallelWorkers">Parallel Workers:</label>
+                        <input type="number" id="parallelWorkers" name="parallelWorkers" min="1" max="8" step="1" value="2" class="option-input">
+                    </div>
+                </div>
+            </div>
+            <div class="options-actions">
+                <button id="resetOptionsBtn" class="btn-secondary">Reset to Defaults</button>
+            </div>
+        </div>
+    </section>
+
     <!-- File List -->
     <section class="file-list-section">
         <div class="section-header">
@@ -62,13 +155,58 @@
         <div id="resultsContainer" class="results-container"></div>
     </section>
 
-    <!-- Log Viewer -->
-    <section class="log-section">
+    <!-- Detailed Progress Section -->
+    <section class="detailed-progress-section" id="detailedProgressSection" style="display: none;">
         <div class="section-header">
-            <h2>Processing Log</h2>
-            <button id="refreshLogBtn" class="btn-secondary">Refresh</button>
+            <h2 id="detailedProgressTitle">Processing Progress</h2>
         </div>
-        <div id="logContainer" class="log-container"></div>
+        <div id="detailedProgressContainer" class="detailed-progress-container">
+            <!-- Overall progress -->
+            <div class="progress-overall">
+                <div class="progress-header">
+                    <span class="progress-label">Overall Progress</span>
+                    <span class="progress-percentage" id="overallProgressPercentage">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="overallProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Current step -->
+            <div class="progress-step-current" id="currentStepContainer">
+                <div class="step-header">
+                    <span class="step-icon" id="currentStepIcon">⏳</span>
+                    <div class="step-info">
+                        <span class="step-name" id="currentStepName">Initializing...</span>
+                        <span class="step-details" id="currentStepDetails"></span>
+                    </div>
+                    <span class="step-progress-percentage" id="currentStepProgress">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill step-progress-bar" id="currentStepProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Step list -->
+            <div class="progress-steps-list" id="stepsList">
+                <div class="step-item" data-step="denoising">
+                    <span class="step-check">○</span>
+                    <span class="step-label">Denoising</span>
+                </div>
+                <div class="step-item" data-step="chunking">
+                    <span class="step-check">○</span>
+                    <span class="step-label">Chunking</span>
+                </div>
+                <div class="step-item" data-step="transcribing">
+                    <span class="step-check">○</span>
+                    <span class="step-label">Transcribing</span>
+                </div>
+                <div class="step-item" data-step="post_processing">
+                    <span class="step-check">○</span>
+                    <span class="step-label">Post-processing</span>
+                </div>
+            </div>
+        </div>
     </section>
 {% endblock %}
 

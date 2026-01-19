@@ -8,9 +8,9 @@ import pytest
 import tempfile
 import sqlite3
 from pathlib import Path
-from models import ProcessedSegment, ASRResult, Segment, FusionResult
-from orchestrator import Orchestrator
-from langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
+from core.models import ProcessedSegment, ASRResult, Segment, FusionResult
+from core.orchestrator import Orchestrator
+from services.langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
 from scripture.scripture_service import ScriptureService
 from scripture.sggs_db import SGGSDatabase
 from quotes.quote_candidates import QuoteCandidateDetector

@@ -14,22 +14,23 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed
 import config
-from models import (
+from core.models import (
     AudioChunk, ASRResult, ProcessedSegment, TranscriptionResult, Segment
 )
-from vad_service import VADService
-from langid_service import LangIDService, ROUTE_PUNJABI_SPEECH, ROUTE_ENGLISH_SPEECH, ROUTE_SCRIPTURE_QUOTE_LIKELY, ROUTE_MIXED
+from services.vad_service import VADService
+from services.langid_service import LangIDService, ROUTE_PUNJABI_SPEECH, ROUTE_ENGLISH_SPEECH, ROUTE_SCRIPTURE_QUOTE_LIKELY, ROUTE_MIXED
 from asr.asr_whisper import ASRWhisper
 from asr.asr_indic import ASRIndic
 from asr.asr_english_fallback import ASREnglish
 from asr.asr_fusion import ASRFusion
-from script_converter import ScriptConverter
+from services.script_converter import ScriptConverter
 from quotes.quote_candidates import QuoteCandidateDetector
 from quotes.assisted_matcher import AssistedMatcher
 from quotes.canonical_replacer import CanonicalReplacer
 from post.transcript_merger import TranscriptMerger
 from post.annotator import Annotator
-from errors import ASREngineError, VADError, FusionError, AudioDenoiseError
+from post.document_formatter import DocumentFormatter
+from core.errors import ASREngineError, VADError, FusionError, AudioDenoiseError
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,10 @@ class Orchestrator:
         self.annotator = Annotator()
         logger.info("Post-processing services initialized for Phase 9")
         
+        # Phase 11: Initialize document formatting
+        self.document_formatter = DocumentFormatter()
+        logger.info("Document formatting service initialized for Phase 11")
+        
         # Create LangID service with ASR-A for quick detection
         if langid_service is None:
             self.langid_service = LangIDService(
@@ -135,12 +140,67 @@ class Orchestrator:
             except Exception as e:
                 logger.warning(f"Failed to initialize AudioDenoiser: {e}. Denoising disabled.")
                 self.denoiser = None
+        
+        # Store current processing options
+        self.current_processing_options = None
+    
+    def _apply_processing_options(self, options: Dict[str, Any], job_id: Optional[str] = None) -> None:
+        """
+        Apply processing options to orchestrator services.
+        
+        Args:
+            options: Dict with processing options
+            job_id: Optional job identifier for logging
+        """
+        self.current_processing_options = options
+        
+        # Update VAD service settings
+        if 'vadAggressiveness' in options:
+            self.vad_service.vad = None  # Reset VAD to reinitialize
+            import webrtcvad
+            self.vad_service.vad = webrtcvad.Vad(options['vadAggressiveness'])
+            logger.debug(f"[{job_id}] VAD aggressiveness set to {options['vadAggressiveness']}")
+        
+        if 'vadMinChunkDuration' in options:
+            self.vad_service.min_chunk_duration = options['vadMinChunkDuration']
+        
+        if 'vadMaxChunkDuration' in options:
+            self.vad_service.max_chunk_duration = options['vadMaxChunkDuration']
+        
+        # Update denoiser if options specify it
+        if options.get('denoiseEnabled', False):
+            try:
+                from audio.denoiser import AudioDenoiser
+                backend = options.get('denoiseBackend', 'noisereduce')
+                strength = options.get('denoiseStrength', 'medium')
+                sample_rate = getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+                
+                # Reinitialize denoiser with new settings
+                self.denoiser = AudioDenoiser(
+                    backend=backend,
+                    strength=strength,
+                    sample_rate=sample_rate
+                )
+                logger.info(f"[{job_id}] Denoiser initialized: backend={backend}, strength={strength}")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Failed to initialize denoiser with options: {e}")
+        elif options.get('denoiseEnabled') is False:
+            # Explicitly disable denoising
+            self.denoiser = None
+        
+        # Update parallel execution settings
+        if 'parallelProcessingEnabled' in options:
+            self.parallel_execution = options['parallelProcessingEnabled']
+        
+        # Note: parallelWorkers is stored in options for use during processing
     
     def transcribe_file(
         self,
         audio_path: Path,
         mode: str = "batch",
-        job_id: Optional[str] = None
+        job_id: Optional[str] = None,
+        processing_options: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[callable] = None
     ) -> TranscriptionResult:
         """
         Transcribe an audio file using the orchestrated pipeline.
@@ -149,6 +209,19 @@ class Orchestrator:
             audio_path: Path to audio file
             mode: Processing mode ("batch" or "live")
             job_id: Optional job identifier for logging (auto-generated if None)
+            processing_options: Optional dict with processing configuration:
+                - denoiseEnabled: bool
+                - denoiseBackend: str
+                - denoiseStrength: str
+                - vadAggressiveness: int
+                - vadMinChunkDuration: float
+                - vadMaxChunkDuration: float
+                - segmentRetryEnabled: bool
+                - maxSegmentRetries: int
+                - parallelProcessingEnabled: bool
+                - parallelWorkers: int
+            progress_callback: Optional callback function with signature:
+                callback(step: str, step_progress: int, overall_progress: int, message: str, details: Optional[dict])
         
         Returns:
             TranscriptionResult with structured segments and metadata
@@ -163,32 +236,56 @@ class Orchestrator:
         filename = audio_path.name
         logger.info(f"[{job_id}] Starting transcription: {filename} (mode: {mode})")
         
+        # Apply processing options
+        if processing_options:
+            self._apply_processing_options(processing_options, job_id)
+        
         # Step 0: Audio denoising (Phase 7) - if enabled
         working_audio_path = audio_path
-        if self.denoiser is not None:
+        denoise_enabled = (
+            processing_options.get('denoiseEnabled', False) if processing_options
+            else getattr(config, 'ENABLE_DENOISING', False)
+        )
+        
+        if progress_callback:
+            progress_callback("denoising", 0, 0, "Checking if denoising is needed...", None)
+        
+        if denoise_enabled and self.denoiser is not None:
             # Check if auto-enable based on noise level
             auto_enable = getattr(config, 'DENOISE_AUTO_ENABLE_THRESHOLD', 0.4)
             try:
+                if progress_callback:
+                    progress_callback("denoising", 10, 2, "Estimating noise level...", None)
                 noise_level = self.denoiser.estimate_noise_level(audio_path)
                 if noise_level >= auto_enable:
                     logger.info(f"[{job_id}] Step 0: Noise level {noise_level:.2f} >= {auto_enable}, applying denoising...")
+                    if progress_callback:
+                        progress_callback("denoising", 30, 5, f"Denoising audio file... (noise level: {noise_level:.2f})", None)
                     try:
                         # Create temporary file for denoised audio
                         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
                             tmp_path = Path(tmp_file.name)
                         working_audio_path = self.denoiser.denoise_file(audio_path, tmp_path)
                         logger.info(f"[{job_id}] Denoised audio saved to temporary file")
+                        if progress_callback:
+                            progress_callback("denoising", 100, 10, "Denoising complete", None)
                     except Exception as e:
                         logger.warning(f"[{job_id}] Denoising failed: {e}. Using original audio.")
                         working_audio_path = audio_path
                 else:
                     logger.debug(f"[{job_id}] Noise level {noise_level:.2f} < {auto_enable}, skipping denoising")
+                    if progress_callback:
+                        progress_callback("denoising", 100, 10, f"Noise level acceptable ({noise_level:.2f}), skipping denoising", None)
             except Exception as e:
                 logger.warning(f"[{job_id}] Noise level estimation failed: {e}. Skipping denoising.")
                 working_audio_path = audio_path
+                if progress_callback:
+                    progress_callback("denoising", 100, 10, "Skipping denoising", None)
         elif getattr(config, 'ENABLE_DENOISING', False):
             # Denoising enabled but not initialized - try to denoise anyway
             logger.info(f"[{job_id}] Step 0: Denoising enabled, applying...")
+            if progress_callback:
+                progress_callback("denoising", 30, 5, "Denoising audio file...", None)
             try:
                 from audio.denoiser import AudioDenoiser
                 denoiser = AudioDenoiser(
@@ -200,15 +297,36 @@ class Orchestrator:
                     tmp_path = Path(tmp_file.name)
                 working_audio_path = denoiser.denoise_file(audio_path, tmp_path)
                 logger.info(f"[{job_id}] Denoised audio saved to temporary file")
+                if progress_callback:
+                    progress_callback("denoising", 100, 10, "Denoising complete", None)
             except Exception as e:
                 logger.warning(f"[{job_id}] Denoising failed: {e}. Using original audio.")
                 working_audio_path = audio_path
+        else:
+            # Denoising not enabled
+            if progress_callback:
+                progress_callback("denoising", 100, 10, "Denoising disabled", None)
         
         # Step 1: VAD chunking
         logger.info(f"[{job_id}] Step 1: Chunking audio with VAD...")
+        if progress_callback:
+            progress_callback("chunking", 0, 10, "Creating audio chunks with VAD...", None)
         try:
-            chunks = self.vad_service.chunk_audio(working_audio_path)
+            # Use options for VAD chunking if provided
+            vad_min = None
+            vad_max = None
+            if processing_options:
+                vad_min = processing_options.get('vadMinChunkDuration')
+                vad_max = processing_options.get('vadMaxChunkDuration')
+            
+            chunks = self.vad_service.chunk_audio(
+                working_audio_path,
+                min_chunk_duration=vad_min,
+                max_chunk_duration=vad_max
+            )
             logger.info(f"[{job_id}] Created {len(chunks)} audio chunks")
+            if progress_callback:
+                progress_callback("chunking", 100, 20, f"Created {len(chunks)} audio chunks", {"chunk_count": len(chunks)})
         except Exception as e:
             logger.error(f"[{job_id}] VAD chunking failed: {e}")
             raise VADError(f"Failed to chunk audio: {e}")
@@ -226,8 +344,17 @@ class Orchestrator:
         total_gurmukhi_text = ""
         total_roman_text = ""  # Will be populated in later phases
         
+        total_chunks = len(chunks)
         for i, chunk in enumerate(chunks):
             logger.info(f"[{job_id}] Processing chunk {i+1}/{len(chunks)} (time: {chunk.start_time:.2f}-{chunk.end_time:.2f}s)")
+            
+            # Update progress for chunk processing
+            if progress_callback:
+                chunk_progress = int((i / total_chunks) * 100) if total_chunks > 0 else 0
+                overall_progress = 20 + int((i / total_chunks) * 70) if total_chunks > 0 else 20
+                progress_callback("transcribing", chunk_progress, overall_progress, 
+                                f"Transcribing chunk {i+1} of {total_chunks}", 
+                                {"current_chunk": i+1, "total_chunks": total_chunks})
             
             # Step 2a: Language/domain identification
             route = self.langid_service.identify_segment(chunk)
@@ -266,11 +393,40 @@ class Orchestrator:
                 )
                 processed_segments.append(error_segment)
         
-        # Step 3: Aggregate results using TranscriptMerger (Phase 9)
+        # Step 2d: Validate all segments have transcriptions
+        logger.info(f"[{job_id}] Validating segment transcriptions...")
+        if progress_callback:
+            progress_callback("transcribing", 100, 90, "Validating transcriptions...", None)
+        segments_with_empty_text = []
+        for i, seg in enumerate(processed_segments):
+            if not seg.text or not seg.text.strip() or seg.text.strip() == "[Transcription error]":
+                segments_with_empty_text.append(i + 1)
+                # Ensure segment is marked for review
+                seg.needs_review = True
+                if not seg.text or not seg.text.strip():
+                    seg.text = "[Transcription failed - review audio]"
+                    logger.warning(f"[{job_id}] Segment {i+1} has empty transcription, marked for review")
+        
+        if segments_with_empty_text:
+            logger.warning(
+                f"[{job_id}] Found {len(segments_with_empty_text)} segment(s) with empty/failed transcriptions: "
+                f"{segments_with_empty_text}. These segments are marked for review."
+            )
+        else:
+            logger.info(f"[{job_id}] All {len(processed_segments)} segments have valid transcriptions")
+        
+        # Step 3: Post-processing
+        if progress_callback:
+            progress_callback("post_processing", 10, 90, "Merging transcriptions...", None)
+        
+        # Step 3a: Aggregate results using TranscriptMerger (Phase 9)
         transcription = {
             "gurmukhi": self.transcript_merger.merge_segments(processed_segments, format="gurmukhi"),
             "roman": self.transcript_merger.merge_segments(processed_segments, format="roman")
         }
+        
+        if progress_callback:
+            progress_callback("post_processing", 50, 93, "Detecting quotes...", None)
         
         # Calculate metrics
         segments_needing_review = sum(1 for seg in processed_segments if seg.needs_review)
@@ -309,12 +465,47 @@ class Orchestrator:
         logger.info(f"[{job_id}] Transcription completed: {len(processed_segments)} segments, "
                    f"avg confidence: {avg_confidence:.2f}, review needed: {segments_needing_review}")
         
-        return TranscriptionResult(
+        result = TranscriptionResult(
             filename=filename,
             segments=processed_segments,
             transcription=transcription,
             metrics=metrics
         )
+        
+        # Phase 11: Auto-generate formatted document (JSON format)
+        if progress_callback:
+            progress_callback("post_processing", 80, 97, "Formatting document...", None)
+        try:
+            formatted_doc = self.document_formatter.format_document(result)
+            # Store formatted document in result metadata for later export
+            result.metrics["formatted_document"] = formatted_doc.to_dict()
+            logger.info(f"[{job_id}] Formatted document generated")
+        except Exception as e:
+            logger.warning(f"[{job_id}] Failed to generate formatted document: {e}")
+            # Don't fail the transcription if formatting fails
+        
+        if progress_callback:
+            progress_callback("post_processing", 100, 100, "Transcription complete", None)
+        
+        return result
+    
+    def format_document(
+        self,
+        result: TranscriptionResult
+    ) -> 'FormattedDocument':
+        """
+        Format a transcription result into a structured document.
+        
+        Phase 11: Document formatting functionality.
+        
+        Args:
+            result: TranscriptionResult to format
+        
+        Returns:
+            FormattedDocument
+        """
+        from models import FormattedDocument
+        return self.document_formatter.format_document(result)
     
     def process_live_audio_chunk(
         self,
@@ -514,6 +705,45 @@ class Orchestrator:
             logger.error(f"[{job_id}] Fusion failed: {e}")
             raise FusionError(f"Failed to fuse hypotheses: {e}")
         
+        # Step 5a: Check for empty transcription and retry if needed
+        retry_enabled = (
+            self.current_processing_options.get('segmentRetryEnabled', True) if self.current_processing_options
+            else getattr(config, 'SEGMENT_RETRY_ON_EMPTY', True)
+        )
+        max_retries = (
+            self.current_processing_options.get('maxSegmentRetries', 2) if self.current_processing_options
+            else getattr(config, 'SEGMENT_MAX_RETRIES', 2)
+        )
+        
+        if retry_enabled and not fusion_result.fused_text.strip() and max_retries > 0:
+            logger.warning(f"[{job_id}] Empty transcription detected, attempting retry (max {max_retries} attempts)...")
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"[{job_id}] Retry attempt {attempt + 1}/{max_retries} with increased resources...")
+                    # Retry with ASR-B (Indic) which is better for complex vocabulary
+                    if self.asr_indic is None:
+                        self.asr_indic = ASRIndic()
+                    retry_result = self.asr_indic.transcribe_chunk(chunk, language, route)
+                    
+                    if retry_result.text.strip():
+                        # Found transcription in retry
+                        logger.info(f"[{job_id}] Retry successful: found transcription")
+                        # Use retry result as primary
+                        fusion_result.fused_text = retry_result.text
+                        fusion_result.fused_confidence = retry_result.confidence
+                        fusion_result.hypotheses = [retry_result]
+                        break
+                    else:
+                        logger.warning(f"[{job_id}] Retry {attempt + 1} also produced empty transcription")
+                except Exception as e:
+                    logger.warning(f"[{job_id}] Retry attempt {attempt + 1} failed: {e}")
+            
+            # If still empty after retries, mark for review
+            if not fusion_result.fused_text.strip():
+                logger.error(f"[{job_id}] All retry attempts failed, segment will be marked for review")
+                fusion_result.fused_text = "[Transcription failed - review audio]"
+                fusion_result.fused_confidence = 0.0
+        
         # Step 6: Apply re-decode policy if needed
         if self.fusion_service.should_redecode(fusion_result):
             logger.warning(f"[{job_id}] Low confidence ({fusion_result.fused_confidence:.2f}), triggering re-decode...")
@@ -706,8 +936,15 @@ class Orchestrator:
                 logger.warning(f"[{job_id}] {engine_name} failed: {e}")
                 return None
         
+        # Determine max workers from options or use number of engines
+        max_workers = len(engines)
+        if self.current_processing_options:
+            parallel_workers = self.current_processing_options.get('parallelWorkers')
+            if parallel_workers:
+                max_workers = min(parallel_workers, len(engines))
+        
         # Run engines in parallel with timeout
-        with ThreadPoolExecutor(max_workers=len(engines)) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(run_engine, engine): engine 
                 for engine in engines

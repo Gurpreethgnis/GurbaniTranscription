@@ -1,9 +1,12 @@
 """
-Audio processing package for Katha Transcription.
+Audio processing modules for Katha Transcription System.
 
-Provides audio denoising and enhancement capabilities for both
-batch and live transcription modes.
+Contains:
+- denoiser: Audio denoising service
+- audio_utils: Audio utility functions
 """
-from audio.denoiser import AudioDenoiser
 
-__all__ = ['AudioDenoiser']
+from .denoiser import Denoiser
+from .audio_utils import get_audio_duration
+
+__all__ = ['Denoiser', 'get_audio_duration']

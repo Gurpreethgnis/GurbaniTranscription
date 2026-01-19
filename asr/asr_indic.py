@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Optional, List
 import config
-from models import AudioChunk, ASRResult, Segment
+from core.models import AudioChunk, ASRResult, Segment
 
 # Reuse device detection from asr_whisper
 from asr.asr_whisper import detect_device

@@ -4,8 +4,8 @@ Test suite for Phase 3, Milestone 3.1: Data Models & Exceptions
 Tests the ConvertedText dataclass and ScriptConversionError exception.
 """
 import pytest
-from models import ConvertedText
-from errors import ScriptConversionError, TranscriptionError
+from core.models import ConvertedText
+from core.errors import ScriptConversionError, TranscriptionError
 
 
 class TestConvertedText:

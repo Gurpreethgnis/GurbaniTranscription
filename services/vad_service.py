@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 import numpy as np
-from models import AudioChunk
+from core.models import AudioChunk
 
 try:
     import webrtcvad

@@ -10,9 +10,9 @@ Tests the complete Phase 3 functionality including:
 - Orchestrator integration
 """
 import pytest
-from models import ConvertedText, ProcessedSegment
-from errors import ScriptConversionError
-from script_converter import (
+from core.models import ConvertedText, ProcessedSegment
+from core.errors import ScriptConversionError
+from services.script_converter import (
     ScriptDetector,
     ShahmukhiToGurmukhiConverter,
     GurmukhiToRomanTransliterator,

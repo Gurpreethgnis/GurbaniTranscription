@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Optional, List
 import config
-from models import AudioChunk, ASRResult, Segment
+from core.models import AudioChunk, ASRResult, Segment
 
 def detect_device():
     """Detect available device (CUDA GPU or CPU)."""

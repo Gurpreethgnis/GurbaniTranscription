@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import timedelta
 
-from models import ProcessedSegment
+from core.models import ProcessedSegment
 
 logger = logging.getLogger(__name__)
 

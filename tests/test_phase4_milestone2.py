@@ -7,8 +7,8 @@ import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
-from models import ScriptureSource, ScriptureLine
-from errors import DatabaseNotFoundError
+from core.models import ScriptureSource, ScriptureLine
+from core.errors import DatabaseNotFoundError
 from scripture.sggs_db import SGGSDatabase
 from scripture.dasam_db import DasamDatabase
 from scripture.scripture_service import ScriptureService

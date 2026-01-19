@@ -11,7 +11,7 @@ Phase 5: Added Unicode normalization support
 import logging
 import unicodedata
 from typing import List, Optional, Dict, Any, Set
-from models import QuoteMatch, QuoteCandidate, ScriptureLine, ScriptureSource
+from core.models import QuoteMatch, QuoteCandidate, ScriptureLine, ScriptureSource
 from scripture.scripture_service import ScriptureService
 from scripture.gurmukhi_to_ascii import try_ascii_search
 import config

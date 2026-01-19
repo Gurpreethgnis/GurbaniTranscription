@@ -6,7 +6,7 @@ a high-confidence match is found, while preserving provenance.
 """
 import logging
 from typing import Optional
-from models import ProcessedSegment, QuoteMatch
+from core.models import ProcessedSegment, QuoteMatch
 import config
 
 logger = logging.getLogger(__name__)

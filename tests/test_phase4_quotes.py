@@ -7,13 +7,13 @@ import pytest
 import tempfile
 from pathlib import Path
 import sqlite3
-from models import ProcessedSegment, QuoteCandidate, QuoteMatch, ScriptureSource, ScriptureLine
+from core.models import ProcessedSegment, QuoteCandidate, QuoteMatch, ScriptureSource, ScriptureLine
 from quotes.quote_candidates import QuoteCandidateDetector
 from quotes.assisted_matcher import AssistedMatcher
 from quotes.canonical_replacer import CanonicalReplacer
 from scripture.scripture_service import ScriptureService
 from scripture.sggs_db import SGGSDatabase
-from langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
+from services.langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
 
 
 class TestQuoteCandidateDetector:

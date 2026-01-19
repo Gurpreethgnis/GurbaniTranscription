@@ -10,8 +10,8 @@ Detects spans of text that might be scripture quotes using multiple signals:
 import logging
 import re
 from typing import List, Optional
-from models import QuoteCandidate, ProcessedSegment
-from langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
+from core.models import QuoteCandidate, ProcessedSegment
+from services.langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
 import config
 
 logger = logging.getLogger(__name__)

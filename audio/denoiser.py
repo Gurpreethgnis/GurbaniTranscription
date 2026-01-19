@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 import numpy as np
-from errors import AudioDenoiseError, AudioDecodeError
+from core.errors import AudioDenoiseError, AudioDecodeError
 
 logger = logging.getLogger(__name__)
 

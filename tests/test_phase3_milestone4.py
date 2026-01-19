@@ -4,7 +4,7 @@ Test suite for Phase 3, Milestone 3.4: Shahmukhi to Gurmukhi Converter
 Tests the ShahmukhiToGurmukhiConverter class.
 """
 import pytest
-from script_converter import ShahmukhiToGurmukhiConverter
+from services.script_converter import ShahmukhiToGurmukhiConverter
 
 
 class TestShahmukhiToGurmukhiConverter:

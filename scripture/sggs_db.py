@@ -8,8 +8,8 @@ import logging
 import sqlite3
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from models import ScriptureLine, ScriptureSource
-from errors import DatabaseNotFoundError
+from core.models import ScriptureLine, ScriptureSource
+from core.errors import DatabaseNotFoundError
 from scripture.gurmukhi_to_ascii import try_ascii_search
 import config
 

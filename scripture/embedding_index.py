@@ -29,7 +29,7 @@ except ImportError:
     FAISS_AVAILABLE = False
     logging.warning("faiss not available. Install with: pip install faiss-cpu or faiss-gpu")
 
-from models import ScriptureLine, ScriptureSource
+from core.models import ScriptureLine, ScriptureSource
 from scripture.sggs_db import SGGSDatabase
 from scripture.dasam_db import DasamDatabase
 

@@ -6,7 +6,7 @@ to produce a single, high-confidence transcription result.
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from models import ASRResult, FusionResult, AudioChunk
+from core.models import ASRResult, FusionResult, AudioChunk
 import config
 
 logger = logging.getLogger(__name__)

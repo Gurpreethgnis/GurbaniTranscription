@@ -5,7 +5,7 @@ Milestone 1: Verify data models work correctly.
 """
 import json
 from datetime import datetime
-from models import (
+from core.models import (
     QuoteContent,
     DocumentSection,
     FormattedDocument,

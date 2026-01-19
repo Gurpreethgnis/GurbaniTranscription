@@ -6,10 +6,10 @@ Provides a single interface for accessing all scripture sources
 """
 import logging
 from typing import List, Optional
-from models import ScriptureLine, ScriptureSource
+from core.models import ScriptureLine, ScriptureSource
 from scripture.sggs_db import SGGSDatabase
 from scripture.dasam_db import DasamDatabase
-from errors import DatabaseNotFoundError
+from core.errors import DatabaseNotFoundError
 
 logger = logging.getLogger(__name__)
 

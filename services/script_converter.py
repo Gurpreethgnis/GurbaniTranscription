@@ -32,7 +32,7 @@ from data.script_mappings import (
     GURMUKHI_CONSONANTS,
     GURMUKHI_SPECIAL_MARKS,
 )
-from errors import ScriptConversionError
+from core.errors import ScriptConversionError
 
 logger = logging.getLogger(__name__)
 
@@ -635,7 +635,7 @@ class ScriptConverter:
         Raises:
             ScriptConversionError: If conversion fails critically
         """
-        from models import ConvertedText
+        from core.models import ConvertedText
         
         if not text or not text.strip():
             return ConvertedText(

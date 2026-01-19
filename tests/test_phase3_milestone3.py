@@ -4,7 +4,7 @@ Test suite for Phase 3, Milestone 3.3: Script Detection
 Tests the ScriptDetector class.
 """
 import pytest
-from script_converter import ScriptDetector
+from services.script_converter import ScriptDetector
 
 
 class TestScriptDetector:

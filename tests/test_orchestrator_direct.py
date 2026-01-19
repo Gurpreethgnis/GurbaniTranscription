@@ -39,7 +39,7 @@ def test_orchestrator_direct():
         print("(This will load VAD, LangID, and ASR services)")
         print("=" * 60)
         
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         
         start_init = time.time()
         orch = Orchestrator()

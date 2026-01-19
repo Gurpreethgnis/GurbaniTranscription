@@ -8,9 +8,9 @@ import pytest
 import tempfile
 import sqlite3
 from pathlib import Path
-from models import ProcessedSegment, ASRResult, Segment, FusionResult, ScriptureSource
-from orchestrator import Orchestrator
-from langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
+from core.models import ProcessedSegment, ASRResult, Segment, FusionResult, ScriptureSource
+from core.orchestrator import Orchestrator
+from services.langid_service import ROUTE_SCRIPTURE_QUOTE_LIKELY
 from scripture.scripture_service import ScriptureService
 from scripture.sggs_db import SGGSDatabase
 
@@ -152,7 +152,7 @@ class TestPhase4Integration:
     def test_low_confidence_no_replacement(self):
         """Test that low confidence matches don't replace text."""
         from quotes.canonical_replacer import CanonicalReplacer
-        from models import QuoteMatch, ScriptureSource
+        from core.models import QuoteMatch, ScriptureSource
         
         replacer = CanonicalReplacer()
         

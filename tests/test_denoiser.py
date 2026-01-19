@@ -9,7 +9,7 @@ import numpy as np
 from pathlib import Path
 import soundfile as sf
 from audio.denoiser import AudioDenoiser
-from errors import AudioDenoiseError, AudioDecodeError
+from core.errors import AudioDenoiseError, AudioDecodeError
 
 
 def create_test_audio_file(

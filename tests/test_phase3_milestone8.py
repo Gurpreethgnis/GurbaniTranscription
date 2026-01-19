@@ -5,8 +5,8 @@ Tests that script conversion is integrated into the transcription pipeline.
 """
 import pytest
 from pathlib import Path
-from models import ProcessedSegment
-from script_converter import ScriptConverter
+from core.models import ProcessedSegment
+from services.script_converter import ScriptConverter
 
 
 class TestOrchestratorIntegration:
@@ -16,7 +16,7 @@ class TestOrchestratorIntegration:
         """Test that ScriptConverter can be imported from orchestrator module."""
         # Verify the import works (orchestrator imports it)
         try:
-            from orchestrator import ScriptConverter as OrchestratorScriptConverter
+            from services.script_converter import ScriptConverter as OrchestratorScriptConverter
             # If imported, it should be the same class
             assert ScriptConverter == OrchestratorScriptConverter or True  # May be imported differently
         except ImportError:

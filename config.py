@@ -143,6 +143,14 @@ LIVE_DENOISE_ENABLED = os.getenv("LIVE_DENOISE_ENABLED", "false").lower() == "tr
 DENOISE_SAMPLE_RATE = int(os.getenv("DENOISE_SAMPLE_RATE", "16000"))  # Target sample rate for denoising (standard for ASR)
 DENOISE_AUTO_ENABLE_THRESHOLD = float(os.getenv("DENOISE_AUTO_ENABLE_THRESHOLD", "0.4"))  # Auto-enable if noise level > threshold (0.0-1.0)
 
+# Segment Reliability Configuration
+SEGMENT_RETRY_ON_EMPTY = os.getenv("SEGMENT_RETRY_ON_EMPTY", "true").lower() == "true"  # Retry segments with empty transcriptions
+SEGMENT_MAX_RETRIES = int(os.getenv("SEGMENT_MAX_RETRIES", "2"))  # Maximum retry attempts per segment
+SEGMENT_RETRY_BEAM_SIZE_MULTIPLIER = float(os.getenv("SEGMENT_RETRY_BEAM_SIZE_MULTIPLIER", "2.0"))  # Multiply beam size on retry
+
+# Parallel Processing Configuration
+ASR_PARALLEL_WORKERS = int(os.getenv("ASR_PARALLEL_WORKERS", "2"))  # Number of parallel workers for ASR processing
+
 # Phase 11: Embedding-Based Semantic Search (Optional)
 USE_EMBEDDING_SEARCH = os.getenv("USE_EMBEDDING_SEARCH", "false").lower() == "true"  # Enable embedding-based semantic search (default: False)
 EMBEDDING_INDEX_PATH = BASE_DIR / "data" / "vectors" / "scripture_index.faiss"  # Path to FAISS index file
@@ -154,13 +162,26 @@ EVAL_REPORTS_DIR = BASE_DIR / "eval" / "reports"
 EVAL_WER_THRESHOLD = float(os.getenv("EVAL_WER_THRESHOLD", "0.15"))  # Target WER for Punjabi (15%)
 EVAL_CER_THRESHOLD = float(os.getenv("EVAL_CER_THRESHOLD", "0.10"))  # Target CER (10%)
 
+# Phase 11: Document Formatting Configuration
+FORMATTED_DOCS_DIR = OUTPUT_DIR / "formatted"  # Directory for formatted document outputs
+OPENING_GURBANI_TIME_WINDOW = float(os.getenv("OPENING_GURBANI_TIME_WINDOW", "120.0"))  # First N seconds to check for opening Gurbani
+TOPIC_EXTRACTION_TIME_WINDOW = float(os.getenv("TOPIC_EXTRACTION_TIME_WINDOW", "300.0"))  # First N seconds to extract topic
+FATEH_PATTERNS = [
+    "waheguru ji ka khalsa",
+    "waheguru ji ki fateh",
+    "bole so nihal",
+    "sat sri akal",
+    "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ",
+    "ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ"
+]  # Patterns to detect Fateh/greetings
+
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_FILE_ENABLED = os.getenv("LOG_FILE_ENABLED", "true").lower() == "true"
 
 # Create directories if they don't exist
-for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR, DATA_DIR, EVAL_GROUND_TRUTH_DIR, EVAL_REPORTS_DIR]:
+for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR, DATA_DIR, EVAL_GROUND_TRUTH_DIR, EVAL_REPORTS_DIR, FORMATTED_DOCS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # Setup logging

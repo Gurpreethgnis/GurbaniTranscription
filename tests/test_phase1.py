@@ -24,7 +24,7 @@ def test_imports():
     print("=" * 60)
     
     try:
-        from models import AudioChunk, Segment, ASRResult, ProcessedSegment, TranscriptionResult
+        from core.models import AudioChunk, Segment, ASRResult, ProcessedSegment, TranscriptionResult
         print("✓ Models imported successfully")
     except Exception as e:
         print(f"✗ Failed to import models: {e}")
@@ -32,7 +32,7 @@ def test_imports():
         return False
     
     try:
-        from vad_service import VADService
+        from services.vad_service import VADService
         print("✓ VADService imported successfully")
     except Exception as e:
         print(f"✗ Failed to import VADService: {e}")
@@ -40,7 +40,7 @@ def test_imports():
         return False
     
     try:
-        from langid_service import LangIDService
+        from services.langid_service import LangIDService
         print("✓ LangIDService imported successfully")
     except Exception as e:
         print(f"✗ Failed to import LangIDService: {e}")
@@ -56,7 +56,7 @@ def test_imports():
         return False
     
     try:
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         print("✓ Orchestrator imported successfully")
     except Exception as e:
         print(f"✗ Failed to import Orchestrator: {e}")
@@ -73,7 +73,7 @@ def test_data_models():
     print("=" * 60)
     
     try:
-        from models import AudioChunk, Segment, ASRResult, ProcessedSegment, TranscriptionResult
+        from core.models import AudioChunk, Segment, ASRResult, ProcessedSegment, TranscriptionResult
         
         # Test AudioChunk
         chunk = AudioChunk(
@@ -143,7 +143,7 @@ def test_vad_service():
     print("=" * 60)
     
     try:
-        from vad_service import VADService
+        from services.vad_service import VADService
         
         # Check if dependencies are available
         try:
@@ -187,7 +187,7 @@ def test_langid_service():
     print("=" * 60)
     
     try:
-        from langid_service import LangIDService, ROUTE_PUNJABI_SPEECH, ROUTE_ENGLISH_SPEECH
+        from services.langid_service import LangIDService, ROUTE_PUNJABI_SPEECH, ROUTE_ENGLISH_SPEECH
         
         langid = LangIDService(
             quick_asr_service=None,  # Will use fallback heuristics
@@ -244,7 +244,7 @@ def test_orchestrator_init():
     print("=" * 60)
     
     try:
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         
         print("Initializing Orchestrator...")
         print("(This will initialize VAD, LangID, and ASR services)")
@@ -287,7 +287,7 @@ def test_end_to_end(audio_file=None):
             return True
     
     try:
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         from pathlib import Path
         
         audio_path = Path(audio_file) if isinstance(audio_file, str) else audio_file

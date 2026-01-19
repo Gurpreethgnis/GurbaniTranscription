@@ -5,7 +5,7 @@ Tests the new data models and configuration parameters for scripture services
 and quote detection.
 """
 import pytest
-from models import (
+from core.models import (
     ScriptureSource, ScriptureLine, QuoteMatch, QuoteCandidate, ProcessedSegment
 )
 import config

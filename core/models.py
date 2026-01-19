@@ -274,3 +274,93 @@ class QuoteCandidate:
             "confidence": self.confidence,
             "detection_reason": self.detection_reason
         }
+
+
+# Phase 11: Document Formatting Models
+
+@dataclass
+class QuoteContent:
+    """Represents formatted Gurbani quote content with full metadata."""
+    gurmukhi: str  # Primary Gurmukhi text
+    roman: str  # Roman transliteration
+    source: str  # Scripture source name (e.g., "Sri Guru Granth Sahib Ji")
+    english_translation: Optional[str] = None  # English translation (if available)
+    ang: Optional[int] = None  # Page number (Ang)
+    raag: Optional[str] = None  # Musical mode (Raag)
+    author: Optional[str] = None  # Writer/author (Guru name)
+    context_lines: List[str] = field(default_factory=list)  # Surrounding lines from shabad
+    line_id: Optional[str] = None  # Line identifier from database
+    shabad_id: Optional[str] = None  # Shabad identifier
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "gurmukhi": self.gurmukhi,
+            "roman": self.roman,
+            "source": self.source
+        }
+        if self.english_translation is not None:
+            result["english_translation"] = self.english_translation
+        if self.ang is not None:
+            result["ang"] = self.ang
+        if self.raag is not None:
+            result["raag"] = self.raag
+        if self.author is not None:
+            result["author"] = self.author
+        if self.context_lines:
+            result["context_lines"] = self.context_lines
+        if self.line_id is not None:
+            result["line_id"] = self.line_id
+        if self.shabad_id is not None:
+            result["shabad_id"] = self.shabad_id
+        return result
+
+
+@dataclass
+class DocumentSection:
+    """Represents a section in a formatted document."""
+    section_type: str  # "opening_gurbani", "fateh", "topic", "quote", "katha"
+    content: Any  # QuoteContent for quotes, str for text sections
+    start_time: float  # Start timestamp in seconds
+    end_time: float  # End timestamp in seconds
+    confidence: Optional[float] = None  # Confidence score if applicable
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "section_type": self.section_type,
+            "start_time": self.start_time,
+            "end_time": self.end_time
+        }
+        if self.confidence is not None:
+            result["confidence"] = self.confidence
+        
+        # Serialize content based on type
+        if isinstance(self.content, QuoteContent):
+            result["content"] = self.content.to_dict()
+        elif isinstance(self.content, str):
+            result["content"] = self.content
+        else:
+            result["content"] = str(self.content)
+        
+        return result
+
+
+@dataclass
+class FormattedDocument:
+    """Represents a formatted document with structured sections."""
+    title: str  # Document title (typically filename without extension)
+    source_file: str  # Original audio filename
+    created_at: str  # ISO format timestamp
+    sections: List[DocumentSection]  # Ordered list of document sections
+    metadata: Dict[str, Any]  # Additional metadata (transcription metrics, etc.)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "title": self.title,
+            "source_file": self.source_file,
+            "created_at": self.created_at,
+            "sections": [section.to_dict() for section in self.sections],
+            "metadata": self.metadata
+        }

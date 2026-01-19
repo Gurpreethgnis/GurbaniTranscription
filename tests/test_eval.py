@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from typing import Dict, Any
 
-from models import (
+from core.models import (
     TranscriptionResult, ProcessedSegment, QuoteMatch, ScriptureSource
 )
 from eval.wer_cer_reports import calculate_wer_cer

@@ -8,8 +8,8 @@ import logging
 import sqlite3
 from pathlib import Path
 from typing import List, Optional
-from models import ScriptureLine, ScriptureSource
-from errors import DatabaseNotFoundError
+from core.models import ScriptureLine, ScriptureSource
+from core.errors import DatabaseNotFoundError
 import config
 
 logger = logging.getLogger(__name__)

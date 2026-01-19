@@ -8,7 +8,7 @@ Phase 1: Rule-based detection (can be enhanced with ML later).
 """
 from pathlib import Path
 from typing import Optional
-from models import AudioChunk
+from core.models import AudioChunk
 
 # Route types
 ROUTE_PUNJABI_SPEECH = "punjabi_speech"

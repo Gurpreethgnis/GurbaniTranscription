@@ -17,7 +17,7 @@ except ImportError:
     JIWER_AVAILABLE = False
     logging.warning("jiwer not available. Install with: pip install jiwer")
 
-from models import TranscriptionResult, ProcessedSegment
+from core.models import TranscriptionResult, ProcessedSegment
 
 logger = logging.getLogger(__name__)
 

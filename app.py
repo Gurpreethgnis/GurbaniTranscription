@@ -5,14 +5,15 @@ import os
 import time
 import threading
 from pathlib import Path
+from typing import Optional
 from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context, render_template
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import config
-from whisper_service import get_whisper_service
-from file_manager import FileManager
-from audio_utils import get_audio_duration
-from orchestrator import Orchestrator
+from services.whisper_service import get_whisper_service
+from utils.file_manager import FileManager
+from audio.audio_utils import get_audio_duration
+from core.orchestrator import Orchestrator
 from ui.websocket_server import WebSocketServer
 
 app = Flask(__name__)
@@ -414,6 +415,9 @@ def transcribe_file_v2():
         progress_data = {
             "filename": filename,
             "progress": 0,
+            "current_step": "initializing",
+            "step_progress": 0,
+            "step_details": None,
             "status": "processing",
             "message": "Starting orchestrated transcription...",
             "elapsed_time": 0,
@@ -422,10 +426,33 @@ def transcribe_file_v2():
         }
         progress_store[filename] = progress_data
         
+        # Parse processing options from request
+        processing_options = data.get('processing_options', {})
+        
+        # Create progress callback
+        def progress_callback(step: str, step_progress: int, overall_progress: int, message: str, details: Optional[dict]):
+            """Update progress store with step information."""
+            elapsed = time.time() - start_time
+            progress_data["current_step"] = step
+            progress_data["step_progress"] = step_progress
+            progress_data["progress"] = overall_progress
+            progress_data["message"] = message
+            progress_data["elapsed_time"] = elapsed
+            progress_data["step_details"] = details
+            
+            # Estimate remaining time
+            if overall_progress > 0 and overall_progress < 100:
+                estimated_total = elapsed / (overall_progress / 100)
+                progress_data["estimated_remaining"] = max(0, estimated_total - elapsed)
+            elif audio_duration:
+                progress_data["estimated_remaining"] = max(0, audio_duration - elapsed)
+        
         # Transcribe using orchestrator
         print(f"Starting transcription of {filename} using orchestrator...")
+        if processing_options:
+            print(f"Processing options: {processing_options}")
         try:
-            result = orch.transcribe_file(file_path, mode="batch")
+            result = orch.transcribe_file(file_path, mode="batch", processing_options=processing_options, progress_callback=progress_callback)
             print(f"Transcription completed for {filename}")
         except Exception as transcribe_error:
             error_msg = f"Transcription failed: {str(transcribe_error)}"
@@ -642,6 +669,12 @@ def get_log():
     })
 
 
+@app.route('/history')
+def history():
+    """History page showing all processed transcriptions."""
+    return render_template('history.html')
+
+
 @app.route('/download/<path:filename>')
 def download_file(filename):
     """Download a transcription file."""
@@ -696,6 +729,245 @@ def handle_file_too_large(e):
 def handle_not_found(e):
     """Handle 404 errors."""
     return jsonify({"error": "Endpoint not found"}), 404
+
+
+@app.route('/format-document', methods=['POST'])
+def format_document():
+    """Format a transcription result into a structured document."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        filename = data.get("filename")
+        if not filename:
+            return jsonify({"error": "filename is required"}), 400
+        
+        # Get transcription result from saved JSON
+        text_path, json_path = file_manager.get_output_paths(filename)
+        if not json_path or not json_path.exists():
+            return jsonify({"error": f"Transcription not found for {filename}"}), 404
+        
+        # Load transcription result
+        import json as json_lib
+        with open(json_path, 'r', encoding='utf-8') as f:
+            saved_data = json_lib.load(f)
+        
+        # Reconstruct TranscriptionResult from saved data
+        from models import TranscriptionResult, ProcessedSegment
+        segments = [
+            ProcessedSegment(**seg_data)
+            for seg_data in saved_data.get("metadata", {}).get("segments", [])
+        ]
+        
+        result = TranscriptionResult(
+            filename=filename,
+            segments=segments,
+            transcription=saved_data.get("transcription", {}),
+            metrics=saved_data.get("metadata", {})
+        )
+        
+        # Format document
+        orch = init_orchestrator()
+        if not orch:
+            return jsonify({"error": "Orchestrator not available"}), 500
+        
+        formatted_doc = orch.format_document(result)
+        
+        return jsonify({
+            "status": "success",
+            "document": formatted_doc.to_dict()
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error formatting document: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/export/<filename>/<format>', methods=['GET'])
+def export_document(filename: str, format: str):
+    """
+    Export formatted document in specified format.
+    
+    Args:
+        filename: Original audio filename
+        format: Export format (txt, json, markdown, html, docx, pdf)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        from urllib.parse import unquote
+        # Decode URL-encoded filename
+        filename = unquote(filename)
+        format_lower = format.lower()
+        
+        # Handle 'txt' as raw text download
+        if format_lower == 'txt':
+            text_path, _ = file_manager.get_output_paths(filename)
+            if not text_path or not text_path.exists():
+                logger.warning(f"Text file not found for: {filename}")
+                return jsonify({"error": f"Text transcription not found for {filename}"}), 404
+            
+            return send_file(
+                str(text_path),
+                as_attachment=True,
+                download_name=text_path.name,
+                mimetype="text/plain; charset=utf-8"
+            )
+        
+        # Handle 'json-raw' as raw JSON download (simple segments)
+        if format_lower == 'json-raw':
+            _, json_path = file_manager.get_output_paths(filename)
+            if not json_path or not json_path.exists():
+                logger.warning(f"JSON file not found for: {filename}")
+                return jsonify({"error": f"JSON transcription not found for {filename}"}), 404
+            
+            return send_file(
+                str(json_path),
+                as_attachment=True,
+                download_name=json_path.name,
+                mimetype="application/json"
+            )
+        
+        # Validate format for formatted exports
+        supported_formats = ["json", "markdown", "html", "docx", "pdf"]
+        if format_lower not in supported_formats:
+            return jsonify({
+                "error": f"Unsupported format: {format}",
+                "supported_formats": ["txt", "json-raw"] + supported_formats
+            }), 400
+        
+        # Get transcription result
+        text_path, json_path = file_manager.get_output_paths(filename)
+        if not json_path:
+            logger.warning(f"No JSON file found for: {filename}")
+            # Try to list available files for debugging
+            available_files = list(config.JSON_DIR.glob("*.json"))
+            logger.debug(f"Available JSON files: {[f.name for f in available_files[:10]]}")
+            return jsonify({
+                "error": f"Transcription not found for {filename}",
+                "hint": "The file may not have been processed yet or the filename may have changed."
+            }), 404
+        
+        # Load and reconstruct TranscriptionResult
+        import json as json_lib
+        with open(json_path, 'r', encoding='utf-8') as f:
+            saved_data = json_lib.load(f)
+        
+        from models import TranscriptionResult, ProcessedSegment
+        
+        # Handle both old and new JSON formats
+        metadata = saved_data.get("metadata", {})
+        segments_data = metadata.get("segments", [])
+        
+        # If no segments in metadata, try to create minimal segment from transcription
+        if not segments_data:
+            logger.warning(f"No segments found in metadata for {filename}, creating minimal segment")
+            transcription_text = saved_data.get("transcription", "")
+            if isinstance(transcription_text, dict):
+                transcription_text = transcription_text.get("gurmukhi", "") or transcription_text.get("roman", "")
+            segments_data = [{
+                "segment_id": "seg_0",
+                "text": transcription_text,
+                "start": 0.0,
+                "end": 0.0,
+                "language": metadata.get("language", "pa"),
+                "confidence": 0.8
+            }]
+        
+        segments = []
+        for seg_data in segments_data:
+            try:
+                segments.append(ProcessedSegment(**seg_data))
+            except Exception as seg_error:
+                logger.warning(f"Failed to parse segment: {seg_error}")
+                continue
+        
+        # Get transcription dict
+        transcription = saved_data.get("transcription", {})
+        if isinstance(transcription, str):
+            transcription = {"gurmukhi": transcription, "roman": ""}
+        
+        result = TranscriptionResult(
+            filename=filename,
+            segments=segments,
+            transcription=transcription,
+            metrics=metadata
+        )
+        
+        # Format document
+        orch = init_orchestrator()
+        if not orch:
+            return jsonify({"error": "Orchestrator not available. Please try again later."}), 500
+        
+        formatted_doc = orch.format_document(result)
+        
+        # Export to requested format
+        from exports import ExportManager
+        from exports.json_exporter import JSONExporter
+        from exports.markdown_exporter import MarkdownExporter
+        from exports.html_exporter import HTMLExporter
+        
+        export_manager = ExportManager()
+        export_manager.register_exporter("json", JSONExporter())
+        export_manager.register_exporter("markdown", MarkdownExporter())
+        export_manager.register_exporter("html", HTMLExporter())
+        
+        # Register optional exporters if available
+        try:
+            from exports.docx_exporter import DOCXExporter
+            export_manager.register_exporter("docx", DOCXExporter())
+        except ImportError as e:
+            logger.debug(f"DOCX exporter not available: {e}")
+            if format_lower == "docx":
+                return jsonify({"error": "DOCX export not available. Install python-docx package."}), 501
+        except Exception as e:
+            logger.warning(f"Failed to register DOCX exporter: {e}")
+            if format_lower == "docx":
+                return jsonify({"error": f"DOCX export failed to initialize: {e}"}), 500
+        
+        try:
+            from exports.pdf_exporter import PDFExporter
+            export_manager.register_exporter("pdf", PDFExporter())
+        except ImportError as e:
+            logger.debug(f"PDF exporter not available: {e}")
+            if format_lower == "pdf":
+                return jsonify({"error": "PDF export not available. Install required PDF packages."}), 501
+        except Exception as e:
+            logger.warning(f"Failed to register PDF exporter: {e}")
+            if format_lower == "pdf":
+                return jsonify({"error": f"PDF export failed to initialize: {e}"}), 500
+        
+        # Get output path - use the stem of the actual found file
+        base_name = json_path.stem  # Use the actual file stem, not the requested filename
+        output_path = config.FORMATTED_DOCS_DIR / f"{base_name}"
+        
+        # Export
+        exported_path = export_manager.export(formatted_doc, format_lower, output_path)
+        
+        logger.info(f"Successfully exported {filename} to {format_lower}: {exported_path}")
+        
+        # Return file
+        return send_file(
+            str(exported_path),
+            as_attachment=True,
+            download_name=exported_path.name,
+            mimetype={
+                "json": "application/json",
+                "markdown": "text/markdown",
+                "html": "text/html",
+                "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "pdf": "application/pdf"
+            }.get(format_lower, "application/octet-stream")
+        )
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"Error exporting document '{filename}' to {format}: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 
 @app.errorhandler(500)

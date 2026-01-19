@@ -101,7 +101,7 @@ class TestLiveOrchestratorIntegration(unittest.TestCase):
     
     def test_live_callback_parameter(self):
         """Test orchestrator accepts live_callback parameter."""
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         
         def test_callback(event_type, data):
             pass
@@ -115,7 +115,7 @@ class TestLiveOrchestratorIntegration(unittest.TestCase):
     
     def test_process_live_audio_chunk_method_exists(self):
         """Test process_live_audio_chunk method exists."""
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         
         orch = Orchestrator()
         self.assertTrue(hasattr(orch, 'process_live_audio_chunk'))

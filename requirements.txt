@@ -49,6 +49,12 @@ scipy>=1.10.0                 # For audio resampling
 # Phase 8: Evaluation Harness
 jiwer>=3.0.0                  # WER/CER computation
 
+# Phase 11: Document Formatting and Export
+python-docx>=1.1.0            # DOCX document generation
+weasyprint>=62.0               # PDF generation from HTML (or use reportlab as fallback)
+# Alternative PDF library (uncomment if WeasyPrint doesn't work):
+# reportlab>=4.0.0              # PDF generation (alternative to WeasyPrint)
+
 # Phase 11: Embedding-Based Semantic Search (Optional)
 # Uncomment to enable semantic search:
 # sentence-transformers>=2.2.0  # Multilingual embeddings

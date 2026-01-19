@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
-from models import ProcessedSegment, QuoteMatch
+from core.models import ProcessedSegment, QuoteMatch
 
 logger = logging.getLogger(__name__)
 

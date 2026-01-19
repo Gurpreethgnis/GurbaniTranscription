@@ -135,15 +135,85 @@ class FileManager:
         return text_file, json_file
     
     def get_output_paths(self, filename: str) -> Tuple[Optional[Path], Optional[Path]]:
-        """Get output file paths for a given filename."""
-        base_name = Path(filename).stem
-        text_file = self.transcriptions_dir / f"{base_name}.txt"
-        json_file = self.json_dir / f"{base_name}.json"
+        """
+        Get output file paths for a given filename.
         
-        text_path = text_file if text_file.exists() else None
-        json_path = json_file if json_file.exists() else None
+        Handles filename variations (spaces vs underscores, secure_filename transformations).
+        """
+        base_name = Path(filename).stem
+        
+        # Try variations of the filename
+        filename_variations = [
+            base_name,                          # Original
+            base_name.replace(' ', '_'),        # Spaces to underscores
+            base_name.replace('_', ' '),        # Underscores to spaces
+            base_name.replace(' ', ''),         # Remove spaces
+        ]
+        
+        text_path = None
+        json_path = None
+        
+        # Find text file
+        for variation in filename_variations:
+            text_file = self.transcriptions_dir / f"{variation}.txt"
+            if text_file.exists():
+                text_path = text_file
+                break
+        
+        # Find JSON file
+        for variation in filename_variations:
+            json_file = self.json_dir / f"{variation}.json"
+            if json_file.exists():
+                json_path = json_file
+                break
+        
+        # If not found by name, search by similar pattern
+        if not text_path:
+            # Try to find any file with similar base name
+            for existing_file in self.transcriptions_dir.glob("*.txt"):
+                if self._filenames_match(base_name, existing_file.stem):
+                    text_path = existing_file
+                    break
+        
+        if not json_path:
+            for existing_file in self.json_dir.glob("*.json"):
+                if self._filenames_match(base_name, existing_file.stem):
+                    json_path = existing_file
+                    break
         
         return text_path, json_path
+    
+    def _filenames_match(self, name1: str, name2: str) -> bool:
+        """
+        Check if two filenames match (ignoring spaces/underscores and case).
+        """
+        # Normalize: lowercase, remove spaces and underscores
+        norm1 = name1.lower().replace(' ', '').replace('_', '')
+        norm2 = name2.lower().replace(' ', '').replace('_', '')
+        return norm1 == norm2
+    
+    def get_formatted_doc_path(self, filename: str, format: str = "json") -> Path:
+        """
+        Get path for formatted document export.
+        
+        Args:
+            filename: Original audio filename
+            format: Export format (json, markdown, html, docx, pdf)
+        
+        Returns:
+            Path for formatted document
+        """
+        from config import FORMATTED_DOCS_DIR
+        base_name = Path(filename).stem
+        extension_map = {
+            "json": ".json",
+            "markdown": ".md",
+            "html": ".html",
+            "docx": ".docx",
+            "pdf": ".pdf"
+        }
+        extension = extension_map.get(format.lower(), ".json")
+        return FORMATTED_DOCS_DIR / f"{base_name}{extension}"
     
     def cleanup_upload(self, file_path: Path):
         """Remove uploaded file after processing (optional cleanup)."""

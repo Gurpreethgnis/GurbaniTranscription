@@ -48,7 +48,7 @@ def test_imports():
         return False
     
     try:
-        from models import FusionResult
+        from core.models import FusionResult
         print("[OK] FusionResult imported successfully")
     except Exception as e:
         print(f"[FAIL] Failed to import FusionResult: {e}")
@@ -56,7 +56,7 @@ def test_imports():
         return False
     
     try:
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         print("[OK] Orchestrator imported successfully")
     except Exception as e:
         print(f"[FAIL] Failed to import Orchestrator: {e}")
@@ -243,7 +243,7 @@ def test_orchestrator_phase2_init():
     print("=" * 60)
     
     try:
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         
         print("Initializing Orchestrator with Phase 2 components...")
         print("(This will initialize VAD, LangID, ASR-A, and optionally ASR-B/C)")
@@ -290,7 +290,7 @@ def test_end_to_end_phase2(audio_file=None):
             return True
     
     try:
-        from orchestrator import Orchestrator
+        from core.orchestrator import Orchestrator
         from pathlib import Path
         
         audio_path = Path(audio_file) if isinstance(audio_file, str) else audio_file

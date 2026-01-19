@@ -4,8 +4,8 @@ Test suite for Phase 3, Milestone 3.6: Main ScriptConverter Service
 Tests the unified ScriptConverter class.
 """
 import pytest
-from script_converter import ScriptConverter
-from models import ConvertedText
+from services.script_converter import ScriptConverter
+from core.models import ConvertedText
 
 
 class TestScriptConverter:

@@ -9,6 +9,9 @@ services:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
       - ./logs:/app/logs
+      # Mount templates and static for live reload
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
       # Cache Whisper models (optional, but speeds up restarts)
       - whisper-cache:/root/.cache/whisper
     environment:

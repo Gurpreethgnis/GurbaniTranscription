@@ -3,7 +3,7 @@ from scripture.sggs_db import SGGSDatabase
 from scripture.scripture_service import ScriptureService
 from scripture.gurmukhi_to_ascii import try_ascii_search
 from quotes.assisted_matcher import AssistedMatcher
-from models import QuoteCandidate
+from core.models import QuoteCandidate
 from rapidfuzz import fuzz
 import config
 

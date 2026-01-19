@@ -270,38 +270,70 @@ response = requests.get(f'http://localhost:5000/download/{filename}.txt')
 
 ```
 KathaTranscription/
-├── app.py                    # Flask backend server
-├── orchestrator.py           # Main pipeline orchestrator
+├── app.py                    # Flask backend server (main entry point)
 ├── config.py                 # Configuration settings
-├── models.py                 # Data models
+├── core/                     # Core modules
+│   ├── orchestrator.py       # Main pipeline orchestrator
+│   ├── models.py             # Data models and schemas
+│   └── errors.py             # Custom exceptions
+├── services/                 # Service modules
+│   ├── whisper_service.py    # Legacy Whisper service
+│   ├── vad_service.py        # Voice Activity Detection
+│   ├── langid_service.py     # Language identification
+│   └── script_converter.py   # Script conversion
+├── utils/                    # Utility modules
+│   └── file_manager.py       # File operations and logging
+├── scripts/                  # Utility scripts
+│   ├── build_embedding_index.py
+│   └── start_server.bat
 ├── asr/                      # ASR engines
 │   ├── asr_whisper.py        # ASR-A: Whisper Large
 │   ├── asr_indic.py          # ASR-B: Indic-tuned Whisper
 │   ├── asr_english_fallback.py  # ASR-C: English Whisper
 │   └── asr_fusion.py         # Fusion layer
 ├── audio/                    # Audio processing
-│   └── denoiser.py           # Audio denoising
+│   ├── denoiser.py           # Audio denoising
+│   └── audio_utils.py        # Audio utilities
 ├── quotes/                   # Quote detection
 │   ├── quote_candidates.py   # Candidate detection
-│   ├── assisted_matcher.py  # Multi-stage matching
+│   ├── assisted_matcher.py   # Multi-stage matching
 │   └── canonical_replacer.py # Canonical replacement
 ├── scripture/                # Scripture databases
 │   ├── sggs_db.py           # SGGS database
 │   ├── dasam_db.py          # Dasam Granth database
+│   ├── scripture_service.py  # Unified scripture API
 │   └── embedding_index.py   # Semantic search
+├── post/                     # Post-processing
+│   ├── annotator.py          # Transcript annotation
+│   ├── document_formatter.py # Document formatting
+│   ├── section_classifier.py # Section classification
+│   └── transcript_merger.py  # Transcript merging
 ├── exports/                  # Export formats
 │   ├── json_exporter.py
 │   ├── markdown_exporter.py
 │   ├── html_exporter.py
 │   ├── docx_exporter.py
 │   └── pdf_exporter.py
-├── static/                   # Web assets
+├── eval/                     # Evaluation tools
+│   ├── wer_cer_reports.py   # WER/CER metrics
+│   └── quote_accuracy_reports.py
+├── ui/                       # UI components
+│   └── websocket_server.py   # WebSocket server
+├── static/                   # Web assets (CSS, JS)
 ├── templates/                # HTML templates
 ├── tests/                    # Test suite
 │   ├── test_phase*.py        # Phase-specific tests
 │   ├── test_*.py             # Component tests
 │   └── __init__.py
-└── outputs/                  # Transcription outputs
+├── data/                     # Data files
+│   ├── script_mappings.py   # Unicode mappings
+│   └── gurmukhi_normalizer.py
+├── outputs/                  # Transcription outputs
+│   ├── transcriptions/       # Text files
+│   ├── json/                 # JSON files
+│   └── formatted/            # Formatted documents
+├── uploads/                  # Uploaded audio files
+└── logs/                     # Log files
 ```
 
 ---

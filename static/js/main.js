@@ -20,14 +20,14 @@ const statusMessage = document.getElementById('statusMessage');
 const progressBar = document.getElementById('progressBar');
 const resultsSection = document.getElementById('resultsSection');
 const resultsContainer = document.getElementById('resultsContainer');
-const logContainer = document.getElementById('logContainer');
-const refreshLogBtn = document.getElementById('refreshLogBtn');
+const detailedProgressSection = document.getElementById('detailedProgressSection');
+const detailedProgressContainer = document.getElementById('detailedProgressContainer');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     initializeEventListeners();
+    initializeAdvancedOptions();
     checkServerStatus();
-    loadLog();
 });
 
 function initializeEventListeners() {
@@ -52,8 +52,28 @@ function initializeEventListeners() {
     // Clear all button
     clearAllBtn.addEventListener('click', clearAllFiles);
     
-    // Refresh log
-    refreshLogBtn.addEventListener('click', loadLog);
+    // Advanced options toggle
+    const toggleOptionsBtn = document.getElementById('toggleOptionsBtn');
+    if (toggleOptionsBtn) {
+        toggleOptionsBtn.addEventListener('click', toggleAdvancedOptions);
+    }
+    
+    // Reset options button
+    const resetOptionsBtn = document.getElementById('resetOptionsBtn');
+    if (resetOptionsBtn) {
+        resetOptionsBtn.addEventListener('click', resetAdvancedOptions);
+    }
+    
+    // VAD aggressiveness slider value display
+    const vadAggressiveness = document.getElementById('vadAggressiveness');
+    if (vadAggressiveness) {
+        vadAggressiveness.addEventListener('input', (e) => {
+            const valueDisplay = document.getElementById('vadAggressivenessValue');
+            if (valueDisplay) {
+                valueDisplay.textContent = e.target.value;
+            }
+        });
+    }
 }
 
 function handleDragOver(e) {
@@ -77,6 +97,136 @@ function handleDrop(e) {
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
     addFiles(files);
+}
+
+// Advanced Options Functions
+function initializeAdvancedOptions() {
+    // Load saved preferences from localStorage
+    const savedOptions = localStorage.getItem('transcriptionOptions');
+    if (savedOptions) {
+        try {
+            const options = JSON.parse(savedOptions);
+            applyAdvancedOptions(options);
+        } catch (e) {
+            console.error('Failed to load saved options:', e);
+        }
+    }
+}
+
+function toggleAdvancedOptions() {
+    const panel = document.getElementById('advancedOptionsPanel');
+    const toggleBtn = document.getElementById('toggleOptionsBtn');
+    
+    if (!panel || !toggleBtn) return;
+    
+    const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+    panel.style.display = isExpanded ? 'none' : 'block';
+    toggleBtn.setAttribute('aria-expanded', !isExpanded);
+    
+    const toggleText = toggleBtn.querySelector('.toggle-text');
+    if (toggleText) {
+        toggleText.textContent = isExpanded ? 'Show Options' : 'Hide Options';
+    }
+}
+
+function collectAdvancedOptions() {
+    return {
+        // Denoising options
+        denoiseEnabled: document.getElementById('denoiseEnabled')?.checked || false,
+        denoiseBackend: document.getElementById('denoiseBackend')?.value || 'noisereduce',
+        denoiseStrength: document.getElementById('denoiseStrength')?.value || 'medium',
+        
+        // Segment processing options
+        vadAggressiveness: parseInt(document.getElementById('vadAggressiveness')?.value || '2'),
+        vadMinChunkDuration: parseFloat(document.getElementById('vadMinChunkDuration')?.value || '1.0'),
+        vadMaxChunkDuration: parseFloat(document.getElementById('vadMaxChunkDuration')?.value || '30.0'),
+        segmentRetryEnabled: document.getElementById('segmentRetryEnabled')?.checked !== false,
+        maxSegmentRetries: parseInt(document.getElementById('maxSegmentRetries')?.value || '2'),
+        
+        // Processing options
+        parallelProcessingEnabled: document.getElementById('parallelProcessingEnabled')?.checked !== false,
+        parallelWorkers: parseInt(document.getElementById('parallelWorkers')?.value || '2')
+    };
+}
+
+function applyAdvancedOptions(options) {
+    // Denoising
+    if (options.denoiseEnabled !== undefined) {
+        const checkbox = document.getElementById('denoiseEnabled');
+        if (checkbox) checkbox.checked = options.denoiseEnabled;
+    }
+    if (options.denoiseBackend) {
+        const select = document.getElementById('denoiseBackend');
+        if (select) select.value = options.denoiseBackend;
+    }
+    if (options.denoiseStrength) {
+        const select = document.getElementById('denoiseStrength');
+        if (select) select.value = options.denoiseStrength;
+    }
+    
+    // Segment processing
+    if (options.vadAggressiveness !== undefined) {
+        const slider = document.getElementById('vadAggressiveness');
+        if (slider) {
+            slider.value = options.vadAggressiveness;
+            const valueDisplay = document.getElementById('vadAggressivenessValue');
+            if (valueDisplay) valueDisplay.textContent = options.vadAggressiveness;
+        }
+    }
+    if (options.vadMinChunkDuration !== undefined) {
+        const input = document.getElementById('vadMinChunkDuration');
+        if (input) input.value = options.vadMinChunkDuration;
+    }
+    if (options.vadMaxChunkDuration !== undefined) {
+        const input = document.getElementById('vadMaxChunkDuration');
+        if (input) input.value = options.vadMaxChunkDuration;
+    }
+    if (options.segmentRetryEnabled !== undefined) {
+        const checkbox = document.getElementById('segmentRetryEnabled');
+        if (checkbox) checkbox.checked = options.segmentRetryEnabled;
+    }
+    if (options.maxSegmentRetries !== undefined) {
+        const input = document.getElementById('maxSegmentRetries');
+        if (input) input.value = options.maxSegmentRetries;
+    }
+    
+    // Processing
+    if (options.parallelProcessingEnabled !== undefined) {
+        const checkbox = document.getElementById('parallelProcessingEnabled');
+        if (checkbox) checkbox.checked = options.parallelProcessingEnabled;
+    }
+    if (options.parallelWorkers !== undefined) {
+        const input = document.getElementById('parallelWorkers');
+        if (input) input.value = options.parallelWorkers;
+    }
+}
+
+function resetAdvancedOptions() {
+    // Reset to defaults
+    const defaults = {
+        denoiseEnabled: false,
+        denoiseBackend: 'noisereduce',
+        denoiseStrength: 'medium',
+        vadAggressiveness: 2,
+        vadMinChunkDuration: 1.0,
+        vadMaxChunkDuration: 30.0,
+        segmentRetryEnabled: true,
+        maxSegmentRetries: 2,
+        parallelProcessingEnabled: true,
+        parallelWorkers: 2
+    };
+    
+    applyAdvancedOptions(defaults);
+    saveAdvancedOptions(defaults);
+    updateStatus('Options reset to defaults', 'success');
+}
+
+function saveAdvancedOptions(options) {
+    try {
+        localStorage.setItem('transcriptionOptions', JSON.stringify(options));
+    } catch (e) {
+        console.error('Failed to save options:', e);
+    }
 }
 
 function addFiles(files) {
@@ -246,13 +396,15 @@ async function processFile(index) {
         if (uploadData.already_processed && uploadData.log_entry) {
             // Fetch the actual transcription text from the server
             try {
-                const transcribeResponse = await fetch('/transcribe', {
+                const processingOptions = collectAdvancedOptions();
+                const transcribeResponse = await fetch('/transcribe-v2', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        filename: uploadData.filename
+                        filename: uploadData.filename,
+                        processing_options: processingOptions
                     })
                 });
                 
@@ -260,8 +412,15 @@ async function processFile(index) {
                     const transcribeData = await transcribeResponse.json();
                     if (transcribeData.status === 'success') {
                         fileData.status = 'success';
-                        fileData.transcription = transcribeData.transcription;
-                        fileData.language = transcribeData.language;
+                        // Handle v2 response structure
+                        if (transcribeData.result) {
+                            const transcription = transcribeData.result.transcription || {};
+                            fileData.transcription = transcription.gurmukhi || transcription.roman || '';
+                            fileData.language = transcribeData.result.segments?.[0]?.language || 'unknown';
+                        } else {
+                            fileData.transcription = transcribeData.transcription || '';
+                            fileData.language = transcribeData.language || 'unknown';
+                        }
                         fileData.text_file = transcribeData.text_file;
                         fileData.json_file = transcribeData.json_file;
                         updateFileList();
@@ -279,14 +438,19 @@ async function processFile(index) {
         updateStatus('Transcribing...', 'info');
         showProgress(true);
         
+        // Collect processing options and save them
+        const processingOptions = collectAdvancedOptions();
+        saveAdvancedOptions(processingOptions);
+        
         // Start transcription in background
-        const transcribePromise = fetch('/transcribe', {
+        const transcribePromise = fetch('/transcribe-v2', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                filename: uploadData.filename
+                filename: uploadData.filename,
+                processing_options: processingOptions
             })
         });
         
@@ -321,8 +485,17 @@ async function processFile(index) {
         
         if (transcribeData.status === 'success') {
             fileData.status = 'success';
-            fileData.transcription = transcribeData.transcription;
-            fileData.language = transcribeData.language;
+            // Handle v2 response structure
+            if (transcribeData.result) {
+                // Extract transcription from result
+                const transcription = transcribeData.result.transcription || {};
+                fileData.transcription = transcription.gurmukhi || transcription.roman || '';
+                fileData.language = transcribeData.result.segments?.[0]?.language || 'unknown';
+            } else {
+                // Fallback to old structure
+                fileData.transcription = transcribeData.transcription || '';
+                fileData.language = transcribeData.language || 'unknown';
+            }
             fileData.text_file = transcribeData.text_file;
             fileData.json_file = transcribeData.json_file;
             updateStatus('Transcription completed!', 'success');
@@ -339,7 +512,6 @@ async function processFile(index) {
         appState.currentProcessingIndex = -1;
         showProgress(false);
         updateFileList();
-        loadLog();
     }
 }
 
@@ -484,7 +656,6 @@ async function processBatch() {
         appState.processing = false;
         showProgress(false);
         updateFileList();
-        loadLog();
     }
 }
 
@@ -523,15 +694,36 @@ function viewTranscription(index) {
                     </svg>
                     Copy to Clipboard
                 </button>
-                <button class="btn-download" onclick="downloadTranscription(${index})">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download Text
-                </button>
-                ${fileData.json_file ? `<button class="btn-download" onclick="downloadJSON(${index})">Download JSON</button>` : ''}
+                <div class="export-dropdown-container" style="position: relative; display: inline-block;">
+                    <select id="formatSelect-${index}" class="format-select" style="padding: 8px 12px; border: 1px solid var(--color-primary); border-radius: 4px 0 0 4px; font-size: 14px; background: white; cursor: pointer; min-width: 180px;">
+                        <optgroup label="Simple Downloads">
+                            <option value="txt">Plain Text (.txt)</option>
+                            <option value="json-raw">Raw JSON (.json)</option>
+                        </optgroup>
+                        <optgroup label="Formatted Documents">
+                            <option value="json">Structured JSON</option>
+                            <option value="markdown">Markdown (.md)</option>
+                            <option value="html">HTML Document</option>
+                            <option value="docx">Word Document (.docx)</option>
+                            <option value="pdf">PDF Document</option>
+                        </optgroup>
+                    </select>
+                    <button class="btn-primary" onclick="exportDocument(${index})" id="exportBtn-${index}" style="border-radius: 0 4px 4px 0; margin-left: -1px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download
+                    </button>
+                </div>
+            </div>
+            <div class="export-help" style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 0.85em; color: #666;">
+                <strong>Export Options:</strong>
+                <ul style="margin: 8px 0 0 20px; padding: 0;">
+                    <li><strong>Plain Text / Raw JSON:</strong> Simple output files with just the transcription</li>
+                    <li><strong>Formatted Documents:</strong> Rich documents with sections, scripture quotes, and metadata</li>
+                </ul>
             </div>
         </div>
     `;
@@ -573,55 +765,137 @@ function copyToClipboard(index) {
 }
 
 function downloadTranscription(index) {
-    const fileData = appState.files[index];
-    
-    // Use the filename from server response if available, otherwise construct from original name
-    let filename;
-    if (fileData.text_file) {
-        // Extract filename from server path (e.g., "/app/outputs/transcriptions/file.txt" -> "file.txt")
-        const pathParts = fileData.text_file.split('/');
-        filename = pathParts[pathParts.length - 1];
-    } else {
-        // Fallback: construct from original filename
-        filename = fileData.name.replace(/\.[^/.]+$/, '') + '.txt';
+    // Redirect to unified export function with txt format
+    const formatSelect = document.getElementById(`formatSelect-${index}`);
+    if (formatSelect) {
+        formatSelect.value = 'txt';
     }
-    
-    if (fileData.text_file) {
-        // Download from server - use the actual filename from server
-        window.open(`/download/${encodeURIComponent(filename)}`, '_blank');
-    } else {
-        // Create and download
-        const transcription = typeof fileData.transcription === 'string' 
-            ? fileData.transcription 
-            : fileData.transcription.transcription || fileData.transcription.text || '';
-        
-        const blob = new Blob([transcription], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
+    exportDocument(index, 'txt');
 }
 
 function downloadJSON(index) {
+    // Redirect to unified export function with json-raw format
+    const formatSelect = document.getElementById(`formatSelect-${index}`);
+    if (formatSelect) {
+        formatSelect.value = 'json-raw';
+    }
+    exportDocument(index, 'json-raw');
+}
+
+async function exportDocument(index, overrideFormat = null) {
     const fileData = appState.files[index];
-    
-    // Use the filename from server response if available
-    let filename;
-    if (fileData.json_file) {
-        // Extract filename from server path
-        const pathParts = fileData.json_file.split('/');
-        filename = pathParts[pathParts.length - 1];
-    } else {
-        // Fallback: construct from original filename
-        filename = fileData.name.replace(/\.[^/.]+$/, '') + '.json';
+    if (!fileData.name) {
+        updateStatus('File name not available', 'error');
+        return;
     }
     
-    if (fileData.json_file) {
-        window.open(`/download/${encodeURIComponent(filename)}`, '_blank');
+    const formatSelect = document.getElementById(`formatSelect-${index}`);
+    const exportBtn = document.getElementById(`exportBtn-${index}`);
+    
+    if (!formatSelect || !exportBtn) {
+        updateStatus('Export controls not found', 'error');
+        return;
     }
+    
+    const format = overrideFormat || formatSelect.value;
+    const filename = fileData.name;
+    
+    // Store original button content
+    const originalBtnContent = exportBtn.innerHTML;
+    
+    // Disable button and show loading state
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+        </svg>
+        Exporting...
+    `;
+    
+    // Get the format extension for download filename
+    const extensionMap = {
+        'txt': '.txt',
+        'json-raw': '.json',
+        'json': '.json',
+        'markdown': '.md',
+        'html': '.html',
+        'docx': '.docx',
+        'pdf': '.pdf'
+    };
+    const extension = extensionMap[format] || '.txt';
+    const downloadFilename = filename.replace(/\.[^/.]+$/, '') + extension;
+    
+    // Export via API using fetch to handle errors properly
+    const exportUrl = `/export/${encodeURIComponent(filename)}/${format}`;
+    
+    try {
+        const response = await fetch(exportUrl);
+        
+        if (!response.ok) {
+            // Try to get error message from JSON response
+            let errorMessage = `Export failed (${response.status})`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+                if (errorData.hint) {
+                    errorMessage += ` - ${errorData.hint}`;
+                }
+            } catch (e) {
+                // Response wasn't JSON, use default message
+            }
+            throw new Error(errorMessage);
+        }
+        
+        // Get the blob from response
+        const blob = await response.blob();
+        
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = downloadFilename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        // Show success state
+        exportBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Downloaded!
+        `;
+        exportBtn.style.background = 'var(--color-success)';
+        updateStatus(`Downloaded ${format.toUpperCase()} document`, 'success');
+        
+        // Reset button after delay
+        setTimeout(() => {
+            exportBtn.disabled = false;
+            exportBtn.innerHTML = originalBtnContent;
+            exportBtn.style.background = '';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        updateStatus(`Export failed: ${error.message}`, 'error');
+        
+        // Reset button on error
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalBtnContent;
+        exportBtn.style.background = '';
+    }
+}
+
+// For backwards compatibility
+function exportFormattedDocument(index) {
+    exportDocument(index);
 }
 
 function updateFileProgress(fileIndex, progressData) {
@@ -634,6 +908,9 @@ function updateFileProgress(fileIndex, progressData) {
     fileData.elapsedTime = progressData.elapsed_time || 0;
     fileData.estimatedRemaining = progressData.estimated_remaining;
     fileData.audioDuration = progressData.audio_duration;
+    fileData.currentStep = progressData.current_step || 'initializing';
+    fileData.stepProgress = progressData.step_progress || 0;
+    fileData.stepDetails = progressData.step_details || null;
     
     // Update the file item in the UI
     const fileItems = fileList.querySelectorAll('.file-item');
@@ -679,9 +956,131 @@ function updateFileProgress(fileIndex, progressData) {
         }
     }
     
+    // Update detailed progress section
+    updateDetailedProgress(fileIndex, progressData);
+    
     // Update status message
     if (fileData.progressMessage) {
         updateStatus(fileData.progressMessage, 'info');
+    }
+}
+
+function updateDetailedProgress(fileIndex, progressData) {
+    if (!detailedProgressSection || !detailedProgressContainer) return;
+    
+    const fileData = appState.files[fileIndex];
+    if (!fileData) return;
+    
+    const currentStep = progressData.current_step || 'initializing';
+    const stepProgress = progressData.step_progress || 0;
+    const overallProgress = progressData.progress || 0;
+    const message = progressData.message || '';
+    const stepDetails = progressData.step_details || null;
+    
+    // Show the detailed progress section
+    detailedProgressSection.style.display = 'block';
+    
+    // Update filename display if in batch mode
+    const sectionHeader = document.getElementById('detailedProgressTitle');
+    if (sectionHeader && appState.processingMode === 'batch') {
+        const processingFiles = appState.files.filter(f => f.status === 'processing');
+        if (processingFiles.length > 1) {
+            sectionHeader.textContent = `Processing Progress (${processingFiles.length} files)`;
+        } else {
+            sectionHeader.textContent = `Processing: ${fileData.name}`;
+        }
+    } else if (sectionHeader) {
+        sectionHeader.textContent = 'Processing Progress';
+    }
+    
+    // Update overall progress
+    const overallProgressBar = document.getElementById('overallProgressBar');
+    const overallProgressPercentage = document.getElementById('overallProgressPercentage');
+    if (overallProgressBar) {
+        overallProgressBar.style.width = `${overallProgress}%`;
+    }
+    if (overallProgressPercentage) {
+        overallProgressPercentage.textContent = `${Math.round(overallProgress)}%`;
+    }
+    
+    // Update current step
+    const currentStepName = document.getElementById('currentStepName');
+    const currentStepDetails = document.getElementById('currentStepDetails');
+    const currentStepProgressBar = document.getElementById('currentStepProgressBar');
+    const currentStepProgress = document.getElementById('currentStepProgress');
+    const currentStepIcon = document.getElementById('currentStepIcon');
+    
+    // Step name mapping
+    const stepNames = {
+        'denoising': 'Denoising Audio',
+        'chunking': 'Creating Audio Chunks',
+        'transcribing': 'Transcribing Chunks',
+        'post_processing': 'Post-processing',
+        'initializing': 'Initializing'
+    };
+    
+    const stepIcons = {
+        'denoising': '🔊',
+        'chunking': '✂️',
+        'transcribing': '📝',
+        'post_processing': '✨',
+        'initializing': '⏳'
+    };
+    
+    if (currentStepName) {
+        currentStepName.textContent = stepNames[currentStep] || currentStep;
+    }
+    if (currentStepIcon) {
+        currentStepIcon.textContent = stepIcons[currentStep] || '⏳';
+    }
+    if (currentStepDetails) {
+        let detailsText = message;
+        if (stepDetails) {
+            if (stepDetails.current_chunk && stepDetails.total_chunks) {
+                detailsText = `Chunk ${stepDetails.current_chunk} of ${stepDetails.total_chunks}`;
+            } else if (stepDetails.chunk_count) {
+                detailsText = `${stepDetails.chunk_count} chunks created`;
+            }
+        }
+        currentStepDetails.textContent = detailsText;
+    }
+    if (currentStepProgressBar) {
+        currentStepProgressBar.style.width = `${stepProgress}%`;
+    }
+    if (currentStepProgress) {
+        currentStepProgress.textContent = `${Math.round(stepProgress)}%`;
+    }
+    
+    // Update step list - mark completed steps
+    const stepsList = document.getElementById('stepsList');
+    if (stepsList) {
+        const stepItems = stepsList.querySelectorAll('.step-item');
+        const stepOrder = ['denoising', 'chunking', 'transcribing', 'post_processing'];
+        const currentStepIndex = stepOrder.indexOf(currentStep);
+        
+        // If step is "initializing" or not found, show all as upcoming
+        const validStepIndex = currentStepIndex >= 0 ? currentStepIndex : -1;
+        
+        stepItems.forEach((item, index) => {
+            const stepName = item.dataset.step;
+            const stepCheck = item.querySelector('.step-check');
+            
+            if (validStepIndex >= 0 && index < validStepIndex) {
+                // Completed step
+                item.classList.add('completed');
+                item.classList.remove('active');
+                if (stepCheck) stepCheck.textContent = '✓';
+            } else if (index === validStepIndex) {
+                // Current step
+                item.classList.add('active');
+                item.classList.remove('completed');
+                if (stepCheck) stepCheck.textContent = '⟳';
+            } else {
+                // Upcoming step
+                item.classList.remove('active', 'completed');
+                if (stepCheck) stepCheck.textContent = '○';
+            }
+        });
     }
 }
 
@@ -708,6 +1107,11 @@ function showProgress(show) {
     progressBar.style.display = show ? 'block' : 'none';
     if (show) {
         progressBar.querySelector('.progress-fill').style.animation = 'progress 2s ease-in-out infinite';
+    } else {
+        // Hide detailed progress when processing stops
+        if (detailedProgressSection) {
+            detailedProgressSection.style.display = 'none';
+        }
     }
 }
 
@@ -726,34 +1130,7 @@ async function checkServerStatus() {
     }
 }
 
-async function loadLog() {
-    try {
-        const response = await fetch('/log');
-        const data = await response.json();
-        
-        if (data.log.length === 0) {
-            logContainer.innerHTML = '<p class="empty-message">No log entries yet</p>';
-            return;
-        }
-        
-        logContainer.innerHTML = data.log.reverse().map(entry => `
-            <div class="log-entry ${entry.status}">
-                <div class="log-header">
-                    <span class="log-filename">${escapeHtml(entry.filename)}</span>
-                    <span class="log-status ${entry.status}">${entry.status}</span>
-                </div>
-                <div class="log-details">
-                    <span>${new Date(entry.timestamp).toLocaleString()}</span>
-                    ${entry.language_detected ? `<span>Language: ${entry.language_detected}</span>` : ''}
-                    ${entry.model_used ? `<span>Model: ${entry.model_used}</span>` : ''}
-                </div>
-                ${entry.error ? `<div class="log-error">Error: ${escapeHtml(entry.error)}</div>` : ''}
-            </div>
-        `).join('');
-    } catch (error) {
-        logContainer.innerHTML = `<p class="error-message">Error loading log: ${error.message}</p>`;
-    }
-}
+// Removed loadLog function - Processing Log section removed
 
 // Update batch process button visibility and state
 function updateBatchProcessButton() {

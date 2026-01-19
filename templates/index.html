@@ -1,82 +1,77 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Transcription - KathaTranscription</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Audio Transcription</h1>
-            <p class="subtitle">Transcribe audio files using Whisper (Punjabi, Urdu, and more)</p>
-        </header>
+{% extends "base.html" %}
 
-        <div class="main-content">
-            <!-- File Selection Section -->
-            <section class="file-selection">
-                <div class="upload-area" id="uploadArea">
-                    <input type="file" id="fileInput" multiple accept="audio/*,video/*" style="display: none;">
-                    <div class="upload-content">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        <p>Click to select files or drag and drop</p>
-                        <p class="hint">Supported: MP3, WAV, M4A, FLAC, OGG, and more</p>
-                    </div>
-                </div>
-            </section>
+{% block title %}File Transcription - KathaTranscription{% endblock %}
 
-            <!-- Processing Mode Selection -->
-            <section class="processing-mode">
-                <h2>Processing Mode</h2>
-                <div class="mode-buttons">
-                    <button class="mode-btn active" data-mode="one-by-one">One by One</button>
-                    <button class="mode-btn" data-mode="batch">Batch Process</button>
-                </div>
-            </section>
+{% block nav_file_active %}active{% endblock %}
 
-            <!-- File List -->
-            <section class="file-list-section">
-                <div class="section-header">
-                    <h2>Selected Files</h2>
-                    <div>
-                        <button id="batchProcessBtn" class="btn-primary" style="display: none; margin-right: 10px;">Process All</button>
-                        <button id="clearAllBtn" class="btn-secondary" style="display: none;">Clear All</button>
-                    </div>
-                </div>
-                <div id="fileList" class="file-list"></div>
-            </section>
+{% block content %}
+    <header class="page-header">
+        <h1>Audio Transcription</h1>
+        <p class="subtitle">Transcribe audio files using Whisper (Punjabi, Urdu, and more)</p>
+    </header>
 
-            <!-- Status Section -->
-            <section class="status-section">
-                <h2>Status</h2>
-                <div id="statusMessage" class="status-message"></div>
-                <div id="progressBar" class="progress-bar" style="display: none;">
-                    <div class="progress-fill"></div>
-                </div>
-            </section>
-
-            <!-- Results Section -->
-            <section class="results-section" id="resultsSection" style="display: none;">
-                <h2>Transcription Results</h2>
-                <div id="resultsContainer" class="results-container"></div>
-            </section>
-
-            <!-- Log Viewer -->
-            <section class="log-section">
-                <div class="section-header">
-                    <h2>Processing Log</h2>
-                    <button id="refreshLogBtn" class="btn-secondary">Refresh</button>
-                </div>
-                <div id="logContainer" class="log-container"></div>
-            </section>
+    <!-- File Selection Section -->
+    <section class="file-selection">
+        <div class="upload-area" id="uploadArea">
+            <input type="file" id="fileInput" multiple accept="audio/*,video/*" style="display: none;">
+            <div class="upload-content">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Click to select files or drag and drop</p>
+                <p class="hint">Supported: MP3, WAV, M4A, FLAC, OGG, and more</p>
+            </div>
         </div>
-    </div>
+    </section>
 
+    <!-- Processing Mode Selection -->
+    <section class="processing-mode">
+        <h2>Processing Mode</h2>
+        <div class="mode-buttons">
+            <button class="mode-btn active" data-mode="one-by-one">One by One</button>
+            <button class="mode-btn" data-mode="batch">Batch Process</button>
+        </div>
+    </section>
+
+    <!-- File List -->
+    <section class="file-list-section">
+        <div class="section-header">
+            <h2>Selected Files</h2>
+            <div>
+                <button id="batchProcessBtn" class="btn-primary" style="display: none; margin-right: 10px;">Process All</button>
+                <button id="clearAllBtn" class="btn-secondary" style="display: none;">Clear All</button>
+            </div>
+        </div>
+        <div id="fileList" class="file-list"></div>
+    </section>
+
+    <!-- Status Section -->
+    <section class="status-section">
+        <h2>Status</h2>
+        <div id="statusMessage" class="status-message"></div>
+        <div id="progressBar" class="progress-bar" style="display: none;">
+            <div class="progress-fill"></div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section" id="resultsSection" style="display: none;">
+        <h2>Transcription Results</h2>
+        <div id="resultsContainer" class="results-container"></div>
+    </section>
+
+    <!-- Log Viewer -->
+    <section class="log-section">
+        <div class="section-header">
+            <h2>Processing Log</h2>
+            <button id="refreshLogBtn" class="btn-secondary">Refresh</button>
+        </div>
+        <div id="logContainer" class="log-container"></div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
     <script src="/static/js/main.js"></script>
-</body>
-</html>
+{% endblock %}

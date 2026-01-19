@@ -96,3 +96,16 @@ class ScriptConversionError(TranscriptionError):
         self.source_script = source_script
         self.target_script = target_script
         self.reason = reason
+
+
+class AudioDenoiseError(TranscriptionError):
+    """Raised when audio denoising fails."""
+    
+    def __init__(self, backend: str, reason: str = ""):
+        message = f"Audio denoising failed (backend: {backend})"
+        if reason:
+            message += f": {reason}"
+        message += f"\nFix: Check that {backend} is installed correctly (pip install {backend})"
+        super().__init__(message)
+        self.backend = backend
+        self.reason = reason

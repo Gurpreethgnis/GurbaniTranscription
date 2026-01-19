@@ -13,12 +13,12 @@ def test_gpu():
     
     try:
         import torch
-        print(f"✓ PyTorch version: {torch.__version__}")
-        print(f"✓ CUDA version (PyTorch): {torch.version.cuda}")
+        print(f"[OK] PyTorch version: {torch.__version__}")
+        print(f"[OK] CUDA version (PyTorch): {torch.version.cuda}")
         
         # Check CUDA availability
         cuda_available = torch.cuda.is_available()
-        print(f"✓ CUDA available: {cuda_available}")
+        print(f"[OK] CUDA available: {cuda_available}")
         
         if not cuda_available:
             print("\n[ERROR] CUDA is not available. Check:")
@@ -29,7 +29,7 @@ def test_gpu():
         
         # Get GPU information
         device_count = torch.cuda.device_count()
-        print(f"✓ Number of GPUs: {device_count}")
+        print(f"[OK] Number of GPUs: {device_count}")
         
         if device_count == 0:
             print("\n[ERROR] No GPU devices found")
@@ -58,16 +58,16 @@ def test_gpu():
         try:
             # Test tensor creation
             x = torch.randn(100, 100, device="cuda")
-            print("  ✓ Tensor creation on GPU: SUCCESS")
+            print("  [OK] Tensor creation on GPU: SUCCESS")
             
             # Test computation
             y = torch.matmul(x, x)
             result = y.mean().item()
-            print(f"  ✓ GPU computation: SUCCESS (result: {result:.4f})")
+            print(f"  [OK] GPU computation: SUCCESS (result: {result:.4f})")
             
             # Test memory operations
             torch.cuda.empty_cache()
-            print("  ✓ GPU memory operations: SUCCESS")
+            print("  [OK] GPU memory operations: SUCCESS")
             
             # Clean up
             del x, y

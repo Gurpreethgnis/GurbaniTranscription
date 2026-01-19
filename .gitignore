@@ -40,5 +40,13 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+# Database files (large, generated)
 data/sggs.sqlite
 data/dasam.db
+
+# Vector index files (generated)
+data/vectors/
+
+# Stray pip version files
+=*

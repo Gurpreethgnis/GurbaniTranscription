@@ -135,13 +135,32 @@ LIVE_VERIFIED_DELAY_S = float(os.getenv("LIVE_VERIFIED_DELAY_S", "2.0"))  # Seco
 WEBSOCKET_PING_INTERVAL = int(os.getenv("WEBSOCKET_PING_INTERVAL", "25"))  # Ping interval in seconds
 WEBSOCKET_PING_TIMEOUT = int(os.getenv("WEBSOCKET_PING_TIMEOUT", "120"))  # Timeout for WebSocket connections (seconds)
 
+# Phase 7: Audio Denoising Configuration
+ENABLE_DENOISING = os.getenv("ENABLE_DENOISING", "false").lower() == "true"  # Enable denoising for batch mode (default: False - opt-in)
+DENOISE_STRENGTH = os.getenv("DENOISE_STRENGTH", "medium")  # Denoising strength: "light", "medium", "aggressive"
+DENOISE_BACKEND = os.getenv("DENOISE_BACKEND", "noisereduce")  # Backend: "noisereduce", "facebook", "deepfilter"
+LIVE_DENOISE_ENABLED = os.getenv("LIVE_DENOISE_ENABLED", "false").lower() == "true"  # Enable denoising for live mode (default: False)
+DENOISE_SAMPLE_RATE = int(os.getenv("DENOISE_SAMPLE_RATE", "16000"))  # Target sample rate for denoising (standard for ASR)
+DENOISE_AUTO_ENABLE_THRESHOLD = float(os.getenv("DENOISE_AUTO_ENABLE_THRESHOLD", "0.4"))  # Auto-enable if noise level > threshold (0.0-1.0)
+
+# Phase 11: Embedding-Based Semantic Search (Optional)
+USE_EMBEDDING_SEARCH = os.getenv("USE_EMBEDDING_SEARCH", "false").lower() == "true"  # Enable embedding-based semantic search (default: False)
+EMBEDDING_INDEX_PATH = BASE_DIR / "data" / "vectors" / "scripture_index.faiss"  # Path to FAISS index file
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")  # Sentence transformer model name
+
+# Phase 8: Evaluation Configuration
+EVAL_GROUND_TRUTH_DIR = BASE_DIR / "eval" / "ground_truth"
+EVAL_REPORTS_DIR = BASE_DIR / "eval" / "reports"
+EVAL_WER_THRESHOLD = float(os.getenv("EVAL_WER_THRESHOLD", "0.15"))  # Target WER for Punjabi (15%)
+EVAL_CER_THRESHOLD = float(os.getenv("EVAL_CER_THRESHOLD", "0.10"))  # Target CER (10%)
+
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_FILE_ENABLED = os.getenv("LOG_FILE_ENABLED", "true").lower() == "true"
 
 # Create directories if they don't exist
-for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR, DATA_DIR]:
+for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR, DATA_DIR, EVAL_GROUND_TRUTH_DIR, EVAL_REPORTS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # Setup logging

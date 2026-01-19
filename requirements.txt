@@ -38,3 +38,25 @@ flask-socketio>=5.3.0          # Flask WebSocket support
 python-socketio>=5.10.0       # Socket.IO Python client/server
 python-engineio>=4.8.0        # Engine.IO Python implementation
 eventlet>=0.35.0              # Async networking library for WebSocket
+
+# Phase 7: Audio Denoising
+noisereduce>=3.0.0            # Spectral gating denoiser (lightweight default)
+scipy>=1.10.0                 # For audio resampling
+# Optional higher-quality backends (uncomment if needed):
+# denoiser>=0.1.5              # Facebook's neural denoiser (requires torch)
+# deepfilternet>=0.5.0         # DeepFilterNet (requires torch and GPU recommended)
+
+# Phase 8: Evaluation Harness
+jiwer>=3.0.0                  # WER/CER computation
+
+# Phase 11: Embedding-Based Semantic Search (Optional)
+# Uncomment to enable semantic search:
+# sentence-transformers>=2.2.0  # Multilingual embeddings
+# faiss-cpu>=1.7.4              # Vector search (CPU version, works on all platforms)
+# 
+# Note: faiss-gpu is NOT available via pip on Windows.
+# For GPU support on Windows, use conda:
+#   conda install -c conda-forge faiss-gpu
+# For Linux/Mac, you can try:
+#   pip install faiss-gpu  # May not work, conda is recommended
+#   OR: conda install -c conda-forge faiss-gpu

@@ -1,0 +1,136 @@
+/**
+ * Theme System for Katha Transcription
+ * Two themes: Harmandir (cultural) and Midnight (modern)
+ */
+
+:root {
+    /* Default to Harmandir theme */
+    --theme-name: 'harmandir';
+}
+
+/* ============================================
+   HARMANDIR THEME (Cultural - Gold & Ivory)
+   ============================================ */
+[data-theme="harmandir"] {
+    /* Colors */
+    --color-primary: #D4AF37;
+    --color-primary-dark: #B8941F;
+    --color-primary-light: #E5C866;
+    --color-secondary: #FF9933;
+    --color-accent: #8B0000;
+    
+    --color-bg: #FFFEF7;
+    --color-bg-secondary: #FFF9E6;
+    --color-bg-tertiary: #F5F0DC;
+    --color-surface: #FFFFFF;
+    --color-surface-hover: #FFFEF7;
+    
+    --color-text: #2C1810;
+    --color-text-secondary: #5C4A3A;
+    --color-text-muted: #8B7355;
+    
+    --color-border: #E5D4A0;
+    --color-border-light: #F0E8D0;
+    
+    /* Sidebar */
+    --sidebar-bg: #FFF9E6;
+    --sidebar-border: #E5D4A0;
+    --sidebar-text: #2C1810;
+    --sidebar-hover: #FFFEF7;
+    --sidebar-active: #D4AF37;
+    --sidebar-active-text: #2C1810;
+    
+    /* Status Colors */
+    --color-success: #2E7D32;
+    --color-success-bg: #E8F5E9;
+    --color-warning: #F57C00;
+    --color-warning-bg: #FFF3E0;
+    --color-error: #C62828;
+    --color-error-bg: #FFEBEE;
+    --color-info: #1976D2;
+    --color-info-bg: #E3F2FD;
+    
+    /* Typography */
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Noto Sans Gurmukhi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-gurmukhi: 'Noto Sans Gurmukhi', sans-serif;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(212, 175, 55, 0.1);
+    --shadow-md: 0 4px 12px rgba(212, 175, 55, 0.15);
+    --shadow-lg: 0 8px 24px rgba(212, 175, 55, 0.2);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #D4AF37 0%, #FF9933 100%);
+    --gradient-bg: linear-gradient(135deg, #FFFEF7 0%, #FFF9E6 100%);
+}
+
+/* ============================================
+   MIDNIGHT THEME (Modern - Dark Blue & Silver)
+   ============================================ */
+[data-theme="midnight"] {
+    /* Colors */
+    --color-primary: #C0C0C0;
+    --color-primary-dark: #A0A0A0;
+    --color-primary-light: #E0E0E0;
+    --color-secondary: #00D4FF;
+    --color-accent: #4A90E2;
+    
+    --color-bg: #0D1B2A;
+    --color-bg-secondary: #1B263B;
+    --color-bg-tertiary: #263A52;
+    --color-surface: #1B263B;
+    --color-surface-hover: #263A52;
+    
+    --color-text: #E8E8E8;
+    --color-text-secondary: #C0C0C0;
+    --color-text-muted: #8B9DC3;
+    
+    --color-border: #415A77;
+    --color-border-light: #263A52;
+    
+    /* Sidebar */
+    --sidebar-bg: #1B263B;
+    --sidebar-border: #415A77;
+    --sidebar-text: #E8E8E8;
+    --sidebar-hover: #263A52;
+    --sidebar-active: #00D4FF;
+    --sidebar-active-text: #0D1B2A;
+    
+    /* Status Colors */
+    --color-success: #4CAF50;
+    --color-success-bg: rgba(76, 175, 80, 0.15);
+    --color-warning: #FF9800;
+    --color-warning-bg: rgba(255, 152, 0, 0.15);
+    --color-error: #F44336;
+    --color-error-bg: rgba(244, 67, 54, 0.15);
+    --color-info: #2196F3;
+    --color-info-bg: rgba(33, 150, 243, 0.15);
+    
+    /* Typography */
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-gurmukhi: 'Noto Sans Gurmukhi', sans-serif;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #C0C0C0 0%, #00D4FF 100%);
+    --gradient-bg: linear-gradient(135deg, #0D1B2A 0%, #1B263B 100%);
+}
+
+/* Apply theme to body */
+body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Theme transition for smooth switching */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

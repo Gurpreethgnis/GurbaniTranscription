@@ -222,9 +222,124 @@ class DasamDatabase:
             window: Number of lines before and after to retrieve
         
         Returns:
-            List of ScriptureLine objects (context lines)
+            List of ScriptureLine objects (context lines, sorted by order)
         """
-        line = self.get_line_by_id(line_id)
-        if line:
-            return [line]
-        return []
+        # First, get the current line
+        current_line = self.get_line_by_id(line_id)
+        if not current_line:
+            return []
+        
+        try:
+            # Check if we have an ordering field
+            cursor = self._connection.execute("PRAGMA table_info(lines)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            order_column = None
+            for col_name in ['line_order', 'order', 'sequence', 'line_number', 'id']:
+                if col_name in columns:
+                    order_column = col_name
+                    break
+            
+            if not order_column:
+                # Fallback: use line_id as numeric ordering
+                try:
+                    current_order = int(line_id.split('_')[-1]) if '_' in line_id else int(line_id)
+                except ValueError:
+                    return [current_line]
+                
+                # Query surrounding lines by numeric ID
+                context_lines = []
+                for offset in range(-window, window + 1):
+                    target_id = current_order + offset
+                    if target_id >= 0:
+                        line = self.get_line_by_id(str(target_id))
+                        if line:
+                            context_lines.append(line)
+                
+                return sorted(context_lines, key=lambda l: int(l.line_id.split('_')[-1]) if '_' in l.line_id else int(l.line_id))
+            
+            # Get current line's order value
+            cursor = self._connection.execute(
+                f"SELECT {order_column} FROM lines WHERE id = ?",
+                (line_id,)
+            )
+            order_row = cursor.fetchone()
+            if not order_row:
+                return [current_line]
+            
+            current_order = order_row[order_column]
+            
+            # Get shabad_id if available (for filtering)
+            shabad_id = None
+            if 'shabad_id' in columns:
+                cursor = self._connection.execute(
+                    "SELECT shabad_id FROM lines WHERE id = ?",
+                    (line_id,)
+                )
+                shabad_row = cursor.fetchone()
+                if shabad_row:
+                    shabad_id = shabad_row['shabad_id']
+            
+            # Query surrounding lines
+            if shabad_id:
+                query = f"""
+                    SELECT * FROM lines
+                    WHERE shabad_id = ? AND {order_column} >= ? AND {order_column} <= ?
+                    ORDER BY {order_column}
+                """
+                params = (shabad_id, current_order - window, current_order + window)
+            else:
+                query = f"""
+                    SELECT * FROM lines
+                    WHERE {order_column} >= ? AND {order_column} <= ?
+                    ORDER BY {order_column}
+                """
+                params = (current_order - window, current_order + window)
+            
+            cursor = self._connection.execute(query, params)
+            context_lines = []
+            
+            for row in cursor.fetchall():
+                # Convert row to ScriptureLine
+                line = self._row_to_scripture_line(row)
+                if line:
+                    context_lines.append(line)
+            
+            return context_lines if context_lines else [current_line]
+            
+        except sqlite3.Error as e:
+            logger.error(f"Database error getting context for line {line_id}: {e}")
+            return [current_line]
+    
+    def _row_to_scripture_line(self, row: sqlite3.Row) -> Optional[ScriptureLine]:
+        """
+        Convert a database row to ScriptureLine object.
+        
+        Args:
+            row: Database row
+        
+        Returns:
+            ScriptureLine object, or None if conversion fails
+        """
+        try:
+            line_id = str(row['id'])
+            gurmukhi = str(row.get('gurmukhi', ''))
+            roman = str(row.get('roman', '')) if row.get('roman') else None
+            ang = int(row['ang']) if row.get('ang') is not None else None
+            raag = str(row['raag']) if row.get('raag') else None
+            author = str(row['author']) if row.get('author') else None
+            shabad_id = str(row['shabad_id']) if row.get('shabad_id') else None
+            
+            return ScriptureLine(
+                line_id=line_id,
+                gurmukhi=gurmukhi,
+                roman=roman,
+                source=ScriptureSource.DasamGranth,
+                ang=ang,
+                raag=raag,
+                author=author,
+                shabad_id=shabad_id
+            )
+        except Exception as e:
+            logger.debug(f"Failed to convert row to ScriptureLine: {e}")
+            return None

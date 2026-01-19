@@ -75,6 +75,65 @@ class SGGSDatabase:
         """Context manager exit."""
         self.close()
     
+    def _resolve_writer_name(self, writer_id: Optional[int]) -> Optional[str]:
+        """
+        Query writers table to get writer name from writer_id.
+        
+        Args:
+            writer_id: Writer ID from database
+        
+        Returns:
+            Writer name in English, or None if not found
+        """
+        if writer_id is None:
+            return None
+        
+        try:
+            cursor = self._connection.execute(
+                "SELECT name_english FROM writers WHERE id = ?",
+                (writer_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return str(row['name_english'])
+        except sqlite3.Error as e:
+            logger.debug(f"Failed to resolve writer name for ID {writer_id}: {e}")
+        
+        return None
+    
+    def _resolve_raag_name(self, section_id: Optional[int]) -> Optional[str]:
+        """
+        Query sections table to get raag name from section_id.
+        
+        Args:
+            section_id: Section ID from database
+        
+        Returns:
+            Raag name, or None if not found
+        """
+        if section_id is None:
+            return None
+        
+        try:
+            # Try common column names for raag
+            cursor = self._connection.execute(
+                "SELECT name, name_english, name_gurmukhi FROM sections WHERE id = ?",
+                (section_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                # Prefer English name, fallback to name, then Gurmukhi
+                if row.get('name_english'):
+                    return str(row['name_english'])
+                elif row.get('name'):
+                    return str(row['name'])
+                elif row.get('name_gurmukhi'):
+                    return str(row['name_gurmukhi'])
+        except sqlite3.Error as e:
+            logger.debug(f"Failed to resolve raag name for section_id {section_id}: {e}")
+        
+        return None
+    
     def _get_table_names(self) -> List[str]:
         """Get list of table names in the database."""
         self._ensure_connection()
@@ -270,22 +329,41 @@ class SGGSDatabase:
                             continue
                 
                 # ShabadOS: raag/author come from shabads table via JOIN
-                # For now, we get writer_id and section_id, but would need additional
-                # queries to get actual names - leaving as None for now
-                # TODO: Add queries to writers and sections tables to get names
-                raag = None
-                for key in ['raag', 'raag_name', 'section_id']:
+                # Resolve writer_id and section_id to actual names
+                writer_id = None
+                section_id = None
+                
+                for key in ['writer_id']:
                     if key in row_keys and row[key] is not None:
-                        # section_id is not raag name, but we'll store it for now
-                        raag = str(row[key])
+                        writer_id = row[key]
                         break
                 
-                author = None
-                for key in ['author', 'writer', 'writer_name', 'writer_id']:
+                for key in ['section_id']:
                     if key in row_keys and row[key] is not None:
-                        # writer_id is not author name, but we'll store it for now
-                        author = str(row[key])
+                        section_id = row[key]
                         break
+                
+                # Resolve writer name
+                author = None
+                if writer_id is not None:
+                    author = self._resolve_writer_name(writer_id)
+                else:
+                    # Fallback to direct author field if available
+                    for key in ['author', 'writer', 'writer_name']:
+                        if key in row_keys and row[key] is not None:
+                            author = str(row[key])
+                            break
+                
+                # Resolve raag name
+                raag = None
+                if section_id is not None:
+                    raag = self._resolve_raag_name(section_id)
+                else:
+                    # Fallback to direct raag field if available
+                    for key in ['raag', 'raag_name']:
+                        if key in row_keys and row[key] is not None:
+                            raag = str(row[key])
+                            break
                 
                 # ShabadOS has transliterations in separate table (now joined)
                 roman = None
@@ -461,11 +539,152 @@ class SGGSDatabase:
             window: Number of lines before and after to retrieve
         
         Returns:
-            List of ScriptureLine objects (context lines)
+            List of ScriptureLine objects (context lines, sorted by order)
         """
-        # For now, return just the line itself
-        # Full implementation would require understanding the database ordering
-        line = self.get_line_by_id(line_id)
-        if line:
-            return [line]
-        return []
+        # First, get the current line to find its shabad_id and order
+        current_line = self.get_line_by_id(line_id)
+        if not current_line:
+            return []
+        
+        try:
+            # Get line details from database to find ordering
+            cursor = self._connection.execute(
+                "SELECT shabad_id, id FROM lines WHERE id = ?",
+                (line_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return [current_line]
+            
+            shabad_id = row.get('shabad_id')
+            
+            # Try to find ordering field (common names: line_order, order, sequence, line_number)
+            # First, check what columns exist in the lines table
+            cursor = self._connection.execute("PRAGMA table_info(lines)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            order_column = None
+            for col_name in ['line_order', 'order', 'sequence', 'line_number', 'id']:
+                if col_name in columns:
+                    order_column = col_name
+                    break
+            
+            if not order_column:
+                # Fallback: use line_id as numeric ordering
+                try:
+                    current_order = int(line_id.split('_')[-1]) if '_' in line_id else int(line_id)
+                except ValueError:
+                    # Can't determine order, return just the line
+                    return [current_line]
+                
+                # Query surrounding lines by numeric ID
+                context_lines = []
+                for offset in range(-window, window + 1):
+                    target_id = current_order + offset
+                    if target_id >= 0:
+                        line = self.get_line_by_id(str(target_id))
+                        if line:
+                            context_lines.append(line)
+                
+                return sorted(context_lines, key=lambda l: int(l.line_id.split('_')[-1]) if '_' in l.line_id else int(l.line_id))
+            
+            # Get current line's order value
+            cursor = self._connection.execute(
+                f"SELECT {order_column} FROM lines WHERE id = ?",
+                (line_id,)
+            )
+            order_row = cursor.fetchone()
+            if not order_row:
+                return [current_line]
+            
+            current_order = order_row[order_column]
+            
+            # Query surrounding lines within the same shabad
+            if shabad_id:
+                query = f"""
+                    SELECT * FROM lines
+                    WHERE shabad_id = ? AND {order_column} >= ? AND {order_column} <= ?
+                    ORDER BY {order_column}
+                """
+                params = (shabad_id, current_order - window, current_order + window)
+            else:
+                # No shabad_id, query by order only
+                query = f"""
+                    SELECT * FROM lines
+                    WHERE {order_column} >= ? AND {order_column} <= ?
+                    ORDER BY {order_column}
+                """
+                params = (current_order - window, current_order + window)
+            
+            cursor = self._connection.execute(query, params)
+            context_lines = []
+            
+            for row in cursor.fetchall():
+                # Convert row to ScriptureLine
+                line = self._row_to_scripture_line(row)
+                if line:
+                    context_lines.append(line)
+            
+            return context_lines if context_lines else [current_line]
+            
+        except sqlite3.Error as e:
+            logger.error(f"Database error getting context for line {line_id}: {e}")
+            return [current_line]
+    
+    def _row_to_scripture_line(self, row: sqlite3.Row) -> Optional[ScriptureLine]:
+        """
+        Convert a database row to ScriptureLine object.
+        
+        Args:
+            row: Database row
+        
+        Returns:
+            ScriptureLine object, or None if conversion fails
+        """
+        try:
+            row_keys = row.keys()
+            line_id = str(row['id'] if 'id' in row_keys else '')
+            gurmukhi = str(row.get('gurmukhi', ''))
+            
+            # Get ang
+            ang = None
+            for key in ['source_page', 'ang', 'page', 'page_number']:
+                if key in row_keys:
+                    try:
+                        ang = int(row[key]) if row[key] is not None else None
+                        break
+                    except (ValueError, TypeError):
+                        continue
+            
+            # Get writer_id and section_id
+            writer_id = row.get('writer_id') if 'writer_id' in row_keys else None
+            section_id = row.get('section_id') if 'section_id' in row_keys else None
+            
+            # Resolve names
+            author = self._resolve_writer_name(writer_id) if writer_id else None
+            raag = self._resolve_raag_name(section_id) if section_id else None
+            
+            # Get roman
+            roman = None
+            for key in ['roman', 'transliteration', 'pronunciation']:
+                if key in row_keys and row[key] is not None:
+                    roman = str(row[key]).strip()
+                    if roman:
+                        break
+            
+            # Get shabad_id
+            shabad_id = row.get('shabad_id') if 'shabad_id' in row_keys else None
+            
+            return ScriptureLine(
+                line_id=line_id,
+                gurmukhi=gurmukhi,
+                roman=roman,
+                source=ScriptureSource.SGGS,
+                ang=ang,
+                raag=raag,
+                author=author,
+                shabad_id=str(shabad_id) if shabad_id else None
+            )
+        except Exception as e:
+            logger.debug(f"Failed to convert row to ScriptureLine: {e}")
+            return None

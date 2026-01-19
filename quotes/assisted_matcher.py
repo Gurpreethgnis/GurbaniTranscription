@@ -11,13 +11,40 @@ Phase 5: Added Unicode normalization support
 import logging
 import unicodedata
 from typing import List, Optional, Dict, Any, Set
-from rapidfuzz import fuzz, process
 from models import QuoteMatch, QuoteCandidate, ScriptureLine, ScriptureSource
 from scripture.scripture_service import ScriptureService
 from scripture.gurmukhi_to_ascii import try_ascii_search
 import config
 
 logger = logging.getLogger(__name__)
+
+# Try to import rapidfuzz, fall back to difflib if not available
+try:
+    from rapidfuzz import fuzz, process
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
+    logger.warning("rapidfuzz not available. Install with: pip install rapidfuzz")
+    # Fallback using difflib
+    import difflib
+    
+    class FuzzFallback:
+        """Fallback implementation using difflib when rapidfuzz is not available."""
+        @staticmethod
+        def token_sort_ratio(s1: str, s2: str, score_cutoff: float = 0) -> float:
+            """Calculate token-sorted ratio similar to rapidfuzz."""
+            if not s1 or not s2:
+                return 0.0
+            # Sort tokens
+            tokens1 = sorted(s1.lower().split())
+            tokens2 = sorted(s2.lower().split())
+            sorted_s1 = ' '.join(tokens1)
+            sorted_s2 = ' '.join(tokens2)
+            # Use difflib to calculate similarity
+            ratio = difflib.SequenceMatcher(None, sorted_s1, sorted_s2).ratio() * 100
+            return ratio if ratio >= score_cutoff else 0.0
+    
+    fuzz = FuzzFallback()
 
 
 class AssistedMatcher:
@@ -28,16 +55,42 @@ class AssistedMatcher:
     to match transcribed text to canonical scripture lines.
     """
     
-    def __init__(self, scripture_service: Optional[ScriptureService] = None):
+    def __init__(
+        self,
+        scripture_service: Optional[ScriptureService] = None,
+        use_embedding_search: Optional[bool] = None
+    ):
         """
         Initialize assisted matcher.
         
         Args:
             scripture_service: ScriptureService instance (created if None)
+            use_embedding_search: Enable embedding-based search (default: from config)
         """
         self.scripture_service = scripture_service or ScriptureService()
         self.confidence_threshold = config.QUOTE_MATCH_CONFIDENCE_THRESHOLD
         self.review_threshold = 0.70  # Below this, no replacement
+        
+        # Initialize embedding index if enabled
+        self.embedding_index = None
+        if use_embedding_search is None:
+            use_embedding_search = getattr(config, 'USE_EMBEDDING_SEARCH', False)
+        
+        if use_embedding_search:
+            try:
+                from scripture.embedding_index import EmbeddingIndex
+                from config import EMBEDDING_INDEX_PATH
+                
+                if EMBEDDING_INDEX_PATH.exists():
+                    self.embedding_index = EmbeddingIndex()
+                    self.embedding_index.load_index(EMBEDDING_INDEX_PATH)
+                    logger.info("Embedding index loaded for semantic search")
+                else:
+                    logger.warning(f"Embedding index not found at {EMBEDDING_INDEX_PATH}. "
+                                 "Building index on first use may be slow.")
+            except ImportError as e:
+                logger.warning(f"Failed to load embedding index: {e}. Falling back to word overlap.")
+                self.embedding_index = None
     
     def find_match(
         self,
@@ -222,12 +275,37 @@ class AssistedMatcher:
             
             keyword_match = 1.0 if search_keywords == line_keywords else 0.5
             
-            # Combined score: fuzzy score + word overlap + keyword match
-            combined_score = (
-                fuzzy_score * 0.5 +  # Fuzzy similarity weight
-                overlap_ratio * 0.3 +  # Word overlap weight
-                keyword_match * 0.2  # Keyword match weight
-            )
+            # Optional: Add embedding similarity if available
+            embedding_similarity = 0.0
+            if self.embedding_index is not None:
+                try:
+                    # Get embedding similarity for this line
+                    primary_text = search_texts[0] if search_texts else ""
+                    if primary_text:
+                        # Search in embedding index
+                        results = self.embedding_index.search(primary_text, top_k=5)
+                        for result_line_id, similarity in results:
+                            if result_line_id == line.line_id:
+                                embedding_similarity = similarity
+                                break
+                except Exception as e:
+                    logger.debug(f"Embedding search failed: {e}")
+            
+            # Combined score: adjust weights based on whether embeddings are available
+            if self.embedding_index is not None:
+                # With embeddings: fuzzy + word overlap + embedding similarity
+                combined_score = (
+                    fuzzy_score * 0.4 +  # Fuzzy similarity weight
+                    overlap_ratio * 0.2 +  # Word overlap weight
+                    embedding_similarity * 0.4  # Embedding similarity weight
+                )
+            else:
+                # Without embeddings: fuzzy + word overlap + keyword match
+                combined_score = (
+                    fuzzy_score * 0.5 +  # Fuzzy similarity weight
+                    overlap_ratio * 0.3 +  # Word overlap weight
+                    keyword_match * 0.2  # Keyword match weight
+                )
             
             # Only keep matches with combined score >= 0.6
             if combined_score >= 0.6:

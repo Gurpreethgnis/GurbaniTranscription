@@ -1,6 +1,6 @@
 # Accuracy-First Katha Transcription System
 
-A production-grade system for transcribing Katha (Sikh religious discourse) with maximum accuracy, featuring multi-ASR ensemble, canonical Gurbani quote detection, and intelligent fusion. Optimized for Punjabi, English, and mixed-language audio with Gurmukhi output.
+A production-grade system for transcribing Katha (Sikh religious discourse) with maximum accuracy, featuring multi-ASR ensemble, canonical Gurbani quote detection, audio denoising, and intelligent fusion. Optimized for Punjabi, English, and mixed-language audio with Gurmukhi output.
 
 ## Features
 
@@ -49,11 +49,18 @@ A production-grade system for transcribing Katha (Sikh religious discourse) with
 - **Quote Highlighting**: Visual distinction with metadata tooltips
 - **Session Management**: Multi-session support with error handling
 
-### Phase 5: Normalization + Transliteration Gap Filling ✅
-- **Gurmukhi Diacritic Normalization**: Tippi/Bindi, Adhak, Nukta normalization
-- **ShabadOS Transliteration Retrieval**: Roman transliteration from database for canonical quotes
-- **Consistent Unicode Normalization**: Applied throughout pipeline using config.UNICODE_NORMALIZATION_FORM
-- **Canonical Quote Transliteration**: Database transliteration flows through to final output
+### Phase 7: Audio Denoising Module ✅
+- **Multi-Backend Support**: Choose from noisereduce (default), Facebook denoiser, or DeepFilterNet
+- **Configurable Strength**: Light, medium, or aggressive noise reduction
+- **Batch Mode**: Full file denoising before VAD chunking
+- **Live Mode**: Real-time chunk-by-chunk denoising for streaming
+- **Auto-Enable**: Automatically enables when noise level exceeds threshold
+- **Opt-In Design**: Disabled by default, enable via environment variables
+
+### Phase 8: Evaluation Harness ✅
+- **WER/CER Computation**: Word and Character Error Rate metrics using jiwer
+- **Ground Truth Management**: Store and manage reference transcriptions
+- **Accuracy Reports**: Generate detailed accuracy reports for testing
 
 ### General Features
 - **Multi-file Processing**: Select and process multiple audio files
@@ -65,7 +72,7 @@ A production-grade system for transcribing Katha (Sikh religious discourse) with
   - JSON files with metadata (.json)
 - **Processing Log**: Track all processed files with timestamps and status
 - **Resume Support**: Skip already processed files automatically
-- **Modern Web UI**: Clean, responsive interface
+- **Modern Web UI**: Clean, responsive interface with theme support
 
 ## Quick Start with Docker (Recommended)
 
@@ -93,6 +100,7 @@ The Docker setup automatically:
 - Sets up FFmpeg
 - Mounts volumes for uploads, outputs, and logs (data persists)
 - Caches Whisper models for faster restarts
+- Enables GPU acceleration (NVIDIA CUDA)
 
 ## Manual Installation (Without Docker)
 
@@ -126,53 +134,50 @@ The Docker setup automatically:
    ```bash
    pip install -r requirements.txt
    ```
-   
-   **Phase 2 Dependencies** (for multi-ASR fusion):
-   ```bash
-   pip install rapidfuzz python-Levenshtein
-   ```
-   
-   **Phase 3 Dependencies** (for script conversion):
-   - No additional dependencies required (uses standard library)
 
 4. **Install PyTorch** (if not already installed):
    - For CPU only: `pip install torch`
    - For GPU (CUDA): Visit [pytorch.org](https://pytorch.org/get-started/locally/) for installation instructions
 
-5. **Choose Whisper implementation**:
-   - **OpenAI Whisper** (default): Already in requirements.txt
-   - **Faster Whisper** (faster, recommended): 
-     ```bash
-     pip uninstall openai-whisper
-     pip install faster-whisper
-     ```
-     Then edit `whisper_service.py` to use faster-whisper (code already supports both)
-
-6. **Start the server**:
+5. **Start the server**:
    ```bash
    python app.py
    ```
 
-7. **Open your browser** and navigate to:
+6. **Open your browser** and navigate to:
    ```
    http://127.0.0.1:5000
    ```
 
 ## Configuration
 
-Edit `config.py` to customize:
+Edit `config.py` or set environment variables to customize:
 
+### Core Settings
 - **Model Size**: Change `WHISPER_MODEL_SIZE` (options: `tiny`, `base`, `small`, `medium`, `large`)
-  - `tiny`: Fastest, least accurate
-  - `base`: Good balance (default)
-  - `small`: Better accuracy
-  - `medium`: High accuracy, slower
-  - `large`: Best accuracy, slowest
 - **Language Hints**: Modify `LANGUAGE_HINTS` for better detection
 - **File Size Limit**: Adjust `MAX_FILE_SIZE_MB`
-- **Server Port**: Change `PORT` if needed (or set `FLASK_PORT` environment variable)
+- **Server Port**: Change `PORT` or set `FLASK_PORT` environment variable
+
+### Audio Denoising (Phase 7)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_DENOISING` | `false` | Enable denoising for batch mode |
+| `LIVE_DENOISE_ENABLED` | `false` | Enable denoising for live mode |
+| `DENOISE_STRENGTH` | `medium` | Strength: `light`, `medium`, `aggressive` |
+| `DENOISE_BACKEND` | `noisereduce` | Backend: `noisereduce`, `facebook`, `deepfilter` |
+| `DENOISE_SAMPLE_RATE` | `16000` | Target sample rate (Hz) |
+| `DENOISE_AUTO_ENABLE_THRESHOLD` | `0.4` | Auto-enable if noise level > threshold |
+
+**Enable denoising for noisy recordings:**
+```bash
+export ENABLE_DENOISING=true
+export DENOISE_STRENGTH=medium
+```
 
 ## Usage
+
+### File Transcription Mode
 
 1. **Select audio files**:
    - Click the upload area or drag and drop files
@@ -190,83 +195,105 @@ Edit `config.py` to customize:
    - Click "View" to see transcription in the browser
    - Click "Download" to save text or JSON files
 
-5. **Check processing log**:
-   - View all processed files in the log section
-   - Click "Refresh" to update the log
+### Live Transcription Mode
+
+1. **Navigate to** `/live` endpoint
+2. **Click "Start Recording"** to begin microphone capture
+3. **View real-time transcription** with draft and verified updates
+4. **Toggle display mode** between Gurmukhi, Roman, or Both
 
 ## Project Structure
 
 ```
 KathaTranscription/
 ├── app.py                          # Flask backend server
-├── orchestrator.py                 # Main pipeline orchestrator (Phase 1+2+3)
+├── orchestrator.py                 # Main pipeline orchestrator
 ├── vad_service.py                  # Voice Activity Detection
 ├── langid_service.py               # Language/domain identification
 ├── whisper_service.py              # Legacy Whisper service
-├── script_converter.py             # Script conversion service (Phase 3)
+├── script_converter.py             # Script conversion service
 ├── file_manager.py                 # File operations and logging
 ├── config.py                       # Configuration settings
 ├── models.py                       # Data models (Segment, ASRResult, etc.)
 ├── errors.py                       # Custom exceptions
 ├── data/
 │   ├── __init__.py
-│   ├── script_mappings.py          # Unicode mapping tables (Phase 3)
-│   └── gurmukhi_normalizer.py      # Gurmukhi diacritic normalization (Phase 5)
+│   ├── script_mappings.py          # Unicode mapping tables
+│   ├── gurmukhi_normalizer.py      # Gurmukhi diacritic normalization
+│   └── vectors/                    # Embedding index files
 ├── asr/
 │   ├── __init__.py
 │   ├── asr_whisper.py              # ASR-A: Whisper Large
-│   ├── asr_indic.py                # ASR-B: Indic-tuned Whisper (Phase 2)
-│   ├── asr_english_fallback.py     # ASR-C: English Whisper (Phase 2)
-│   └── asr_fusion.py               # Fusion layer (Phase 2)
-├── Dockerfile                      # Docker configuration
-├── docker-compose.yml              # Docker Compose configuration
+│   ├── asr_indic.py                # ASR-B: Indic-tuned Whisper
+│   ├── asr_english_fallback.py     # ASR-C: English Whisper
+│   └── asr_fusion.py               # Fusion layer
+├── audio/
+│   ├── __init__.py
+│   └── denoiser.py                 # Audio denoising service (Phase 7)
+├── quotes/
+│   ├── __init__.py
+│   ├── quote_candidates.py         # Quote candidate detection
+│   ├── assisted_matcher.py         # Multi-stage matching
+│   └── canonical_replacer.py       # Canonical text replacement
+├── scripture/
+│   ├── __init__.py
+│   ├── sggs_db.py                  # SGGS database interface
+│   ├── dasam_db.py                 # Dasam Granth database
+│   ├── scripture_service.py        # Unified scripture API
+│   ├── embedding_index.py          # Semantic search embeddings
+│   └── gurmukhi_to_ascii.py        # Script conversion utilities
+├── post/
+│   ├── __init__.py
+│   ├── annotator.py                # Transcript annotation
+│   └── transcript_merger.py        # Transcript merging utilities
+├── eval/
+│   ├── __init__.py
+│   ├── dataset_builder.py          # Evaluation dataset creation
+│   ├── wer_cer_reports.py          # WER/CER accuracy reports
+│   ├── quote_accuracy_reports.py   # Quote detection accuracy
+│   ├── ground_truth/               # Reference transcriptions
+│   └── reports/                    # Generated evaluation reports
+├── ui/
+│   ├── __init__.py
+│   └── websocket_server.py         # WebSocket server (Phase 6)
 ├── static/
 │   ├── css/
-│   │   └── style.css               # Application styles
+│   │   ├── style.css               # Main application styles
+│   │   └── themes.css              # Theme support
 │   └── js/
-│       └── main.js                 # Frontend JavaScript
+│       ├── main.js                 # Main frontend JavaScript
+│       ├── live.js                 # Live mode JavaScript
+│       └── navigation.js           # Navigation utilities
 ├── templates/
-│   └── index.html                  # Main UI
+│   ├── base.html                   # Base template
+│   ├── index.html                  # Main UI
+│   └── live.html                   # Live transcription UI
 ├── uploads/                        # Temporary upload directory
-├── outputs/                        # Generated outputs
+├── outputs/
 │   ├── transcriptions/             # Text files
 │   └── json/                       # JSON files
 ├── logs/
 │   └── processed_files.json        # Processing log
+├── Dockerfile                      # Docker configuration
+├── docker-compose.yml              # Docker Compose configuration
 ├── requirements.txt                # Python dependencies
-├── test_phase1.py                  # Phase 1 test suite
-├── test_phase2.py                  # Phase 2 test suite
-├── test_phase3.py                  # Phase 3 comprehensive test suite
-├── test_phase4_milestone1.py       # Phase 4 milestone 1 tests
-├── test_phase4_milestone2.py       # Phase 4 milestone 2 tests
-├── test_phase4_quotes.py          # Phase 4 quote detection tests
-├── test_phase5.py                  # Phase 5 comprehensive test suite
-├── test_phase6.py                  # Phase 6 comprehensive test suite
-├── ui/                             # Phase 6: Live mode UI
-│   ├── __init__.py
-│   └── websocket_server.py         # WebSocket server
-├── PHASE2_COMPLETION_REPORT.md     # Phase 2 completion documentation
-├── PHASE2_TEST_RESULTS.md          # Phase 2 test results
-├── PHASE3_COMPLETION_REPORT.md     # Phase 3 completion documentation
-├── PHASE3_TEST_RESULTS.md          # Phase 3 test results
-├── PHASE4_COMPLETION_REPORT.md     # Phase 4 completion documentation
-├── PHASE5_COMPLETION_REPORT.md     # Phase 5 completion documentation
 └── README.md                       # This file
 ```
 
 ## API Endpoints
 
+### REST API
 - `GET /` - Main application page
-- `GET /live` - Live transcription page (Phase 6)
+- `GET /live` - Live transcription page
 - `GET /status` - Server and model status
 - `POST /upload` - Upload audio file
 - `POST /transcribe` - Transcribe single file (legacy)
-- `POST /transcribe-v2` - Transcribe with Phase 2 multi-ASR ensemble
+- `POST /transcribe-v2` - Transcribe with multi-ASR ensemble
 - `POST /transcribe-batch` - Transcribe multiple files
 - `GET /log` - Get processing log
 - `GET /download/<filename>` - Download transcription file
 
-### WebSocket Events (Phase 6)
+### WebSocket Events
 
 **Client → Server:**
 - `audio_chunk` - Send audio chunk for processing
@@ -281,45 +308,37 @@ KathaTranscription/
 
 ## Testing
 
-### Phase 1 Tests
+### Run All Tests
 ```bash
+python -m pytest test_*.py -v
+```
+
+### Phase-Specific Tests
+```bash
+# Phase 1: Baseline Pipeline
 python test_phase1.py
-```
 
-### Phase 2 Tests
-```bash
+# Phase 2: Multi-ASR Fusion
 python test_phase2.py
-```
 
-### Phase 3 Tests
-```bash
+# Phase 3: Script Conversion
 python test_phase3.py
-```
 
-### Phase 4 Tests
-```bash
-python -m pytest test_phase4_milestone1.py test_phase4_milestone2.py test_phase4_quotes.py -v
-```
+# Phase 4: Scripture + Quote Detection
+python -m pytest test_phase4_*.py -v
 
-### Phase 5 Tests
-```bash
+# Phase 5: Normalization
 python test_phase5.py
-```
 
-### Phase 6 Tests
-```bash
+# Phase 6: Live Mode
 python test_phase6.py
-```
 
-Tests include:
-- Module imports
-- Data model validation
-- Script detection
-- Shahmukhi to Gurmukhi conversion
-- Gurmukhi to Roman transliteration
-- ScriptConverter service
-- Orchestrator integration
-- End-to-end conversion pipeline
+# Phase 7: Audio Denoising
+python -m pytest test_denoiser.py -v
+
+# Phase 8: Evaluation
+python test_eval.py
+```
 
 ## Output Files
 
@@ -329,27 +348,20 @@ Plain text files containing the transcription.
 ### JSON Files (`outputs/json/`)
 Structured data with:
 - `filename`: Original filename
-- `transcription`: Object with `gurmukhi` and `roman` fields (Phase 3)
+- `transcription`: Object with `gurmukhi` and `roman` fields
 - `timestamp`: Processing timestamp
 - `segments`: Array of segments, each with:
   - `text`: Gurmukhi text
-  - `gurmukhi`: Gurmukhi representation (Phase 3)
-  - `roman`: Roman transliteration (Phase 3)
-  - `original_script`: Detected original script (Phase 3)
-  - `script_confidence`: Conversion confidence (Phase 3)
+  - `gurmukhi`: Gurmukhi representation
+  - `roman`: Roman transliteration
+  - `original_script`: Detected original script
+  - `script_confidence`: Conversion confidence
   - `start`, `end`: Timestamps
   - `confidence`: ASR confidence
   - `language`: Detected language
+  - `is_quote`: Whether segment is a detected quote
+  - `quote_metadata`: Quote info (Ang, Raag, Author) if applicable
 - `metadata`: Language, segments, etc.
-
-### Log File (`logs/processed_files.json`)
-JSON array tracking all processed files with:
-- Filename and hash
-- Processing timestamp
-- Status (success/error)
-- Language detected
-- Output file paths
-- Error messages (if any)
 
 ## Troubleshooting
 
@@ -358,56 +370,28 @@ JSON array tracking all processed files with:
 **Container won't start:**
 - Check Docker is running: `docker ps`
 - Check logs: `docker-compose logs`
-- Ensure port 5000 is not in use: Change port in `docker-compose.yml`
+- Ensure port 5000 is not in use
+
+**GPU not detected:**
+- Ensure NVIDIA drivers are installed
+- Install NVIDIA Container Toolkit
+- Check GPU access: `docker run --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi`
 
 **Model download issues:**
 - First run downloads the model (can take time)
-- Check internet connection
 - Models are cached in Docker volume `whisper-cache`
-
-**Permission errors:**
-- On Linux/Mac, you may need to adjust file permissions:
-  ```bash
-  chmod -R 755 uploads outputs logs
-  ```
-
-### Model Loading Issues
-- Ensure PyTorch is installed correctly
-- Check available disk space (models can be 100MB-3GB)
-- Try a smaller model size first (`tiny` or `base`)
 
 ### Audio Processing Errors
 - Verify FFmpeg is installed and in PATH
 - Check audio file format is supported
 - Ensure file is not corrupted
 
-### Server Not Starting
-- Check if port 5000 is already in use
-- Change port in `config.py` or set `FLASK_PORT` environment variable
-- Ensure all dependencies are installed
-
-### Slow Processing
-- Use `faster-whisper` instead of `openai-whisper`
-- Use a smaller model size
-- Process files one at a time instead of batch
-- Consider GPU acceleration (CUDA) - requires custom Dockerfile
-
-## Performance Tips
-
-1. **Use Faster Whisper**: Significantly faster than OpenAI Whisper
-2. **Model Size**: Balance between speed and accuracy
+### Performance Tips
+1. **Use GPU**: Significantly faster than CPU-only
+2. **Enable Denoising**: For noisy recordings, enable denoising for better accuracy
+3. **Model Size**: Balance between speed and accuracy
    - For quick processing: `tiny` or `base`
-   - For better accuracy: `small` or `medium`
-3. **GPU Acceleration**: Install CUDA-enabled PyTorch for faster processing (requires custom Dockerfile)
-4. **Batch Processing**: More efficient for multiple files
-
-## Language Support
-
-Whisper supports 99 languages. The application is optimized for:
-- **Punjabi** (pa)
-- **Urdu** (ur)
-- **English** (en)
-- Mixed languages (auto-detected)
+   - For better accuracy: `small` or `medium` or `large`
 
 ## Docker Commands
 
@@ -431,77 +415,34 @@ docker-compose up --build
 docker-compose down -v
 ```
 
+## Implementation Phases
+
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 1 | Baseline Orchestrated Pipeline | ✅ Complete |
+| 2 | Multi-ASR Ensemble + Fusion | ✅ Complete |
+| 3 | Script Conversion | ✅ Complete |
+| 4 | Scripture Services + Quote Detection | ✅ Complete |
+| 5 | Normalization + Transliteration | ✅ Complete |
+| 6 | Live Mode + WebSocket UI | ✅ Complete |
+| 7 | Audio Denoising Module | ✅ Complete |
+| 8 | Evaluation Harness | ✅ Complete |
+
+## Language Support
+
+Optimized for:
+- **Punjabi** (pa) - Gurmukhi and Shahmukhi scripts
+- **Hindi** (hi) - Devanagari script
+- **English** (en)
+- **Mixed languages** (auto-detected)
+
 ## License
 
 This project is provided as-is for personal use.
-
-## Implementation Phases
-
-### Phase 1: Baseline Orchestrated Pipeline ✅
-- VAD chunking with overlap buffers
-- Language/domain identification
-- ASR-A (Whisper Large) with forced language
-- Structured segment output with confidence scores
-
-### Phase 2: Multi-ASR Ensemble + Fusion ✅
-- ASR-B (Indic-tuned Whisper) for Punjabi/Hindi/Braj
-- ASR-C (English Whisper) for English segments
-- Intelligent fusion with voting and confidence merging
-- Re-decode policy for low-confidence segments
-- Hybrid execution (ASR-A immediate, ASR-B/C parallel)
-
-### Phase 3: Script Conversion ✅
-- Automatic script detection (Shahmukhi, Gurmukhi, English, Devanagari, mixed)
-- Shahmukhi to Gurmukhi conversion with common word dictionary
-- Gurmukhi to Roman transliteration (ISO 15919, IAST, practical schemes)
-- Dual-output generation (Gurmukhi + Roman)
-- Integrated into transcription pipeline
-- Confidence scoring and review flagging
-
-### Phase 4: Scripture Services + Quote Detection ✅
-- ShabadOS SGGS database integration with flexible schema detection
-- Dasam Granth database with auto-creation
-- Unified scripture service API for all sources
-- High-recall quote candidate detection (route, patterns, vocabulary)
-- Assisted matching with 3-stage verification (fuzzy + semantic + verifier)
-- Canonical text replacement with metadata (Ang, Raag, Author, Source)
-- Provenance preservation (original spoken text kept)
-
-### Phase 5: Normalization + Transliteration Gap Filling ✅
-- Comprehensive Gurmukhi diacritic normalization (tippi/bindi, adhak, nukta)
-- ShabadOS transliteration retrieval for canonical quotes
-- Consistent Unicode normalization using config.UNICODE_NORMALIZATION_FORM
-- Canonical quote transliteration flows through to final output
-
-### Phase 6: Live Mode + WebSocket UI ✅
-- WebSocket server infrastructure with Flask-SocketIO
-- Real-time audio streaming from browser microphone
-- Draft captions (immediate ASR-A output) with < 2s latency
-- Verified updates (after quote detection) with < 5s latency
-- Live transcript display with Gurmukhi/Roman/Both toggle
-- Quote highlighting with metadata (Ang, Raag, Author)
-- Session management and error handling
-
-### Phase 6: Live Mode + WebSocket UI ✅
-- WebSocket server infrastructure with Flask-SocketIO
-- Real-time audio streaming from browser microphone
-- Draft captions (immediate ASR-A output) with < 2s latency
-- Verified updates (after quote detection) with < 5s latency
-- Live transcript display with Gurmukhi/Roman/Both toggle
-- Quote highlighting with metadata (Ang, Raag, Author)
-- Session management and error handling
-- Browser-based audio capture using MediaRecorder API
 
 ## Notes
 
 - First run will download Whisper models (can take a few minutes)
 - Models are cached in `~/.cache/whisper/` (local) or Docker volume (Docker)
-- Phase 2 uses multiple ASR engines - may require more GPU memory
-- Phase 3 script conversion is automatic and adds minimal processing time
 - Large audio files may take significant time to process
-- Processing time depends on model size, number of ASR engines, and hardware
-- See `PHASE2_COMPLETION_REPORT.md` for Phase 2 implementation details
-- See `PHASE3_COMPLETION_REPORT.md` for Phase 3 implementation details
-- See `PHASE4_COMPLETION_REPORT.md` for Phase 4 implementation details
-- See `PHASE5_COMPLETION_REPORT.md` for Phase 5 implementation details
-- See `PHASE6_COMPLETION_REPORT.md` for Phase 6 implementation details
+- See individual `PHASE*_COMPLETION_REPORT.md` files for detailed implementation documentation

@@ -121,7 +121,7 @@ def init_live_orchestrator(websocket_server_instance):
 @app.route('/')
 def index():
     """Serve the main HTML page."""
-    return send_from_directory('templates', 'index.html')
+    return render_template('index.html')
 
 
 @app.route('/live')

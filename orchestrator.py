@@ -27,7 +27,9 @@ from script_converter import ScriptConverter
 from quotes.quote_candidates import QuoteCandidateDetector
 from quotes.assisted_matcher import AssistedMatcher
 from quotes.canonical_replacer import CanonicalReplacer
-from errors import ASREngineError, VADError, FusionError
+from post.transcript_merger import TranscriptMerger
+from post.annotator import Annotator
+from errors import ASREngineError, VADError, FusionError, AudioDenoiseError
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,11 @@ class Orchestrator:
         self.quote_replacer = CanonicalReplacer()
         logger.info("Quote detection services initialized for Phase 4")
         
+        # Phase 9: Initialize post-processing services
+        self.transcript_merger = TranscriptMerger()
+        self.annotator = Annotator()
+        logger.info("Post-processing services initialized for Phase 9")
+        
         # Create LangID service with ASR-A for quick detection
         if langid_service is None:
             self.langid_service = LangIDService(
@@ -114,8 +121,20 @@ class Orchestrator:
         # Phase 6: Live mode callback
         self.live_callback = live_callback
         
-        # Phase 6: Live mode callback
-        self.live_callback = live_callback
+        # Phase 7: Initialize audio denoiser (if enabled)
+        self.denoiser = None
+        if getattr(config, 'ENABLE_DENOISING', False):
+            try:
+                from audio.denoiser import AudioDenoiser
+                self.denoiser = AudioDenoiser(
+                    backend=getattr(config, 'DENOISE_BACKEND', 'noisereduce'),
+                    strength=getattr(config, 'DENOISE_STRENGTH', 'medium'),
+                    sample_rate=getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+                )
+                logger.info("AudioDenoiser initialized for Phase 7")
+            except Exception as e:
+                logger.warning(f"Failed to initialize AudioDenoiser: {e}. Denoising disabled.")
+                self.denoiser = None
     
     def transcribe_file(
         self,
@@ -144,14 +163,63 @@ class Orchestrator:
         filename = audio_path.name
         logger.info(f"[{job_id}] Starting transcription: {filename} (mode: {mode})")
         
+        # Step 0: Audio denoising (Phase 7) - if enabled
+        working_audio_path = audio_path
+        if self.denoiser is not None:
+            # Check if auto-enable based on noise level
+            auto_enable = getattr(config, 'DENOISE_AUTO_ENABLE_THRESHOLD', 0.4)
+            try:
+                noise_level = self.denoiser.estimate_noise_level(audio_path)
+                if noise_level >= auto_enable:
+                    logger.info(f"[{job_id}] Step 0: Noise level {noise_level:.2f} >= {auto_enable}, applying denoising...")
+                    try:
+                        # Create temporary file for denoised audio
+                        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                            tmp_path = Path(tmp_file.name)
+                        working_audio_path = self.denoiser.denoise_file(audio_path, tmp_path)
+                        logger.info(f"[{job_id}] Denoised audio saved to temporary file")
+                    except Exception as e:
+                        logger.warning(f"[{job_id}] Denoising failed: {e}. Using original audio.")
+                        working_audio_path = audio_path
+                else:
+                    logger.debug(f"[{job_id}] Noise level {noise_level:.2f} < {auto_enable}, skipping denoising")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Noise level estimation failed: {e}. Skipping denoising.")
+                working_audio_path = audio_path
+        elif getattr(config, 'ENABLE_DENOISING', False):
+            # Denoising enabled but not initialized - try to denoise anyway
+            logger.info(f"[{job_id}] Step 0: Denoising enabled, applying...")
+            try:
+                from audio.denoiser import AudioDenoiser
+                denoiser = AudioDenoiser(
+                    backend=getattr(config, 'DENOISE_BACKEND', 'noisereduce'),
+                    strength=getattr(config, 'DENOISE_STRENGTH', 'medium'),
+                    sample_rate=getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+                )
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                    tmp_path = Path(tmp_file.name)
+                working_audio_path = denoiser.denoise_file(audio_path, tmp_path)
+                logger.info(f"[{job_id}] Denoised audio saved to temporary file")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Denoising failed: {e}. Using original audio.")
+                working_audio_path = audio_path
+        
         # Step 1: VAD chunking
         logger.info(f"[{job_id}] Step 1: Chunking audio with VAD...")
         try:
-            chunks = self.vad_service.chunk_audio(audio_path)
+            chunks = self.vad_service.chunk_audio(working_audio_path)
             logger.info(f"[{job_id}] Created {len(chunks)} audio chunks")
         except Exception as e:
             logger.error(f"[{job_id}] VAD chunking failed: {e}")
             raise VADError(f"Failed to chunk audio: {e}")
+        finally:
+            # Clean up temporary denoised file if created
+            if working_audio_path != audio_path and working_audio_path.exists():
+                try:
+                    working_audio_path.unlink()
+                    logger.debug(f"[{job_id}] Cleaned up temporary denoised file")
+                except Exception as e:
+                    logger.warning(f"[{job_id}] Failed to clean up temp file: {e}")
         
         # Step 2: Process each chunk
         processed_segments = []
@@ -198,10 +266,10 @@ class Orchestrator:
                 )
                 processed_segments.append(error_segment)
         
-        # Step 3: Aggregate results
+        # Step 3: Aggregate results using TranscriptMerger (Phase 9)
         transcription = {
-            "gurmukhi": total_gurmukhi_text.strip(),
-            "roman": total_roman_text.strip()  # Will be populated in later phases
+            "gurmukhi": self.transcript_merger.merge_segments(processed_segments, format="gurmukhi"),
+            "roman": self.transcript_merger.merge_segments(processed_segments, format="roman")
         }
         
         # Calculate metrics
@@ -293,10 +361,32 @@ class Orchestrator:
         
         logger.debug(f"[{job_id}] Processing live audio chunk: {start_time:.2f}-{end_time:.2f}s")
         
+        # Phase 7: Denoise audio chunk if enabled for live mode
+        working_audio_bytes = audio_bytes
+        if getattr(config, 'LIVE_DENOISE_ENABLED', False):
+            try:
+                if self.denoiser is None:
+                    # Initialize denoiser on-demand for live mode
+                    from audio.denoiser import AudioDenoiser
+                    self.denoiser = AudioDenoiser(
+                        backend=getattr(config, 'DENOISE_BACKEND', 'noisereduce'),
+                        strength=getattr(config, 'DENOISE_STRENGTH', 'medium'),
+                        sample_rate=getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+                    )
+                    logger.debug(f"[{job_id}] AudioDenoiser initialized for live mode")
+                
+                # Get sample rate from chunk_data or use default
+                sample_rate = getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+                working_audio_bytes = self.denoiser.denoise_chunk(audio_bytes, sample_rate)
+                logger.debug(f"[{job_id}] Audio chunk denoised")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Live denoising failed: {e}. Using original audio.")
+                working_audio_bytes = audio_bytes
+        
         # Create temporary file from audio bytes
         try:
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
-                tmp_file.write(audio_bytes)
+                tmp_file.write(working_audio_bytes)
                 tmp_path = Path(tmp_file.name)
             
             # Create AudioChunk

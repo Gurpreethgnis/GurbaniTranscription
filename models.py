@@ -4,6 +4,7 @@ Data models for the transcription pipeline.
 This module defines the core data structures used throughout the system.
 """
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -101,10 +102,17 @@ class ProcessedSegment:
     language: str
     hypotheses: List[Dict[str, Any]] = field(default_factory=list)  # For future multi-ASR support
     needs_review: bool = False
+    # Phase 3: Script conversion fields
+    roman: Optional[str] = None  # Roman transliteration
+    original_script: Optional[str] = None  # Detected original script
+    script_confidence: Optional[float] = None  # Script conversion confidence
+    # Phase 4: Quote matching fields
+    quote_match: Optional['QuoteMatch'] = None  # Matched quote (if this is a scripture quote)
+    spoken_text: Optional[str] = None  # Original ASR text (preserved for quotes)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "start": self.start,
             "end": self.end,
             "route": self.route,
@@ -113,6 +121,41 @@ class ProcessedSegment:
             "confidence": self.confidence,
             "language": self.language,
             "hypotheses": self.hypotheses,
+            "needs_review": self.needs_review
+        }
+        # Add Phase 3 fields if present
+        if self.roman is not None:
+            result["roman"] = self.roman
+        if self.original_script is not None:
+            result["original_script"] = self.original_script
+        if self.script_confidence is not None:
+            result["script_confidence"] = self.script_confidence
+        # Add Phase 4 fields if present
+        if self.quote_match is not None:
+            result["quote_match"] = self.quote_match.to_dict()
+        if self.spoken_text is not None:
+            result["spoken_text"] = self.spoken_text
+        return result
+
+
+@dataclass
+class ConvertedText:
+    """Represents text with dual-script output (Gurmukhi + Roman)."""
+    original: str                    # Original ASR output
+    original_script: str             # Detected script ("shahmukhi", "gurmukhi", "devanagari", "english", "mixed")
+    gurmukhi: str                    # Gurmukhi representation
+    roman: str                       # Roman transliteration
+    confidence: float                # Conversion confidence (0.0-1.0)
+    needs_review: bool               # Flag for uncertain conversions
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "original": self.original,
+            "original_script": self.original_script,
+            "gurmukhi": self.gurmukhi,
+            "roman": self.roman,
+            "confidence": self.confidence,
             "needs_review": self.needs_review
         }
 
@@ -132,4 +175,102 @@ class TranscriptionResult:
             "transcription": self.transcription,
             "segments": [seg.to_dict() for seg in self.segments],
             "metrics": self.metrics
+        }
+
+
+# Phase 4: Scripture and Quote Models
+
+class ScriptureSource(str, Enum):
+    """Enumeration of scripture sources."""
+    SGGS = "Sri Guru Granth Sahib Ji"
+    DasamGranth = "Dasam Granth"
+    BhaiGurdas = "Bhai Gurdas Vaaran"
+    BhaiNandLal = "Bhai Nand Lal Bani"
+    Other = "Other Literature"
+
+
+@dataclass
+class ScriptureLine:
+    """Represents a line from scripture with metadata."""
+    line_id: str  # Unique identifier for the line
+    gurmukhi: str  # Gurmukhi text
+    roman: Optional[str] = None  # Roman transliteration (if available)
+    source: ScriptureSource = ScriptureSource.SGGS
+    ang: Optional[int] = None  # Page number (for SGGS)
+    raag: Optional[str] = None  # Musical mode
+    author: Optional[str] = None  # Writer/author
+    shabad_id: Optional[str] = None  # Shabad identifier (if part of a shabad)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "line_id": self.line_id,
+            "gurmukhi": self.gurmukhi,
+            "source": self.source.value
+        }
+        if self.roman is not None:
+            result["roman"] = self.roman
+        if self.ang is not None:
+            result["ang"] = self.ang
+        if self.raag is not None:
+            result["raag"] = self.raag
+        if self.author is not None:
+            result["author"] = self.author
+        if self.shabad_id is not None:
+            result["shabad_id"] = self.shabad_id
+        return result
+
+
+@dataclass
+class QuoteMatch:
+    """Represents a match between transcribed text and canonical scripture."""
+    source: ScriptureSource
+    line_id: str  # ID of the matched line
+    canonical_text: str  # Canonical Gurmukhi text from database
+    spoken_text: str  # Original ASR output that was matched
+    confidence: float  # Match confidence (0.0-1.0)
+    canonical_roman: Optional[str] = None  # Canonical Roman transliteration
+    ang: Optional[int] = None  # Page number
+    raag: Optional[str] = None  # Musical mode
+    author: Optional[str] = None  # Writer/author
+    match_method: str = "fuzzy"  # How the match was found: "fuzzy", "semantic", "exact"
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "source": self.source.value,
+            "line_id": self.line_id,
+            "canonical_text": self.canonical_text,
+            "spoken_text": self.spoken_text,
+            "confidence": self.confidence,
+            "match_method": self.match_method
+        }
+        if self.canonical_roman is not None:
+            result["canonical_roman"] = self.canonical_roman
+        if self.ang is not None:
+            result["ang"] = self.ang
+        if self.raag is not None:
+            result["raag"] = self.raag
+        if self.author is not None:
+            result["author"] = self.author
+        return result
+
+
+@dataclass
+class QuoteCandidate:
+    """Represents a candidate span that might be a scripture quote."""
+    start: float  # Start timestamp
+    end: float  # End timestamp
+    text: str  # Candidate text
+    confidence: float  # Detection confidence (0.0-1.0)
+    detection_reason: str  # Why this was detected as a candidate
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "start": self.start,
+            "end": self.end,
+            "text": self.text,
+            "confidence": self.confidence,
+            "detection_reason": self.detection_reason
         }

@@ -82,3 +82,17 @@ class VADError(TranscriptionError):
         message += "\nFix: Check audio file format and VAD service configuration"
         super().__init__(message)
         self.reason = reason
+
+
+class ScriptConversionError(TranscriptionError):
+    """Raised when script conversion fails."""
+    
+    def __init__(self, source_script: str, target_script: str, reason: str = ""):
+        message = f"Script conversion failed: {source_script} → {target_script}"
+        if reason:
+            message += f". Reason: {reason}"
+        message += "\nFix: Check input text for unsupported characters or invalid script"
+        super().__init__(message)
+        self.source_script = source_script
+        self.target_script = target_script
+        self.reason = reason

@@ -17,12 +17,28 @@ A production-grade system for transcribing Katha (Sikh religious discourse) with
 - **Hybrid Execution**: ASR-A immediate, ASR-B/C parallel based on route
 - **Multi-Hypothesis Storage**: All ASR outputs preserved for review
 
-### Coming in Phase 3+
-- **Scripture Services**: SGGS + Dasam Granth database integration
-- **Quote Detection**: High-recall candidate detection
-- **Assisted Matching**: Fuzzy + semantic + verifier stages
+### Phase 3: Script Conversion ✅
+- **Automatic Script Detection**: Detects Shahmukhi, Gurmukhi, English, Devanagari, or mixed
+- **Shahmukhi to Gurmukhi Conversion**: Converts Arabic-based Punjabi to Gurmukhi script
+- **Gurmukhi to Roman Transliteration**: Transliterates to Roman script (ISO 15919, IAST, or practical)
+- **Dual-Output Generation**: Produces both Gurmukhi and Roman transliteration
+- **Common Word Dictionary**: Uses dictionary lookup for accurate conversion
+- **Confidence Scoring**: Flags uncertain conversions for review
+- **Integrated Pipeline**: Automatically applied to all transcription segments
+
+### Phase 4: Scripture Services + Quote Detection ✅
+- **Scripture Services**: ShabadOS SGGS + Dasam Granth database integration
+- **Unified Scripture API**: Single interface for all scripture sources
+- **Quote Candidate Detection**: High-recall detection using multiple signals
+- **Assisted Matching**: Multi-stage matching (fuzzy + semantic + verifier)
 - **Canonical Replacement**: Exact bani text with metadata (Ang, Raag, author)
-- **Script Normalization**: Gurmukhi-first output with Roman transliteration
+- **Provenance Preservation**: Original ASR text preserved alongside canonical
+
+### Phase 5: Normalization + Transliteration Gap Filling ✅
+- **Gurmukhi Diacritic Normalization**: Tippi/Bindi, Adhak, Nukta normalization
+- **ShabadOS Transliteration Retrieval**: Roman transliteration from database for canonical quotes
+- **Consistent Unicode Normalization**: Applied throughout pipeline using config.UNICODE_NORMALIZATION_FORM
+- **Canonical Quote Transliteration**: Database transliteration flows through to final output
 
 ### General Features
 - **Multi-file Processing**: Select and process multiple audio files
@@ -100,6 +116,9 @@ The Docker setup automatically:
    ```bash
    pip install rapidfuzz python-Levenshtein
    ```
+   
+   **Phase 3 Dependencies** (for script conversion):
+   - No additional dependencies required (uses standard library)
 
 4. **Install PyTorch** (if not already installed):
    - For CPU only: `pip install torch`
@@ -165,14 +184,19 @@ Edit `config.py` to customize:
 ```
 KathaTranscription/
 ├── app.py                          # Flask backend server
-├── orchestrator.py                 # Main pipeline orchestrator (Phase 1+2)
+├── orchestrator.py                 # Main pipeline orchestrator (Phase 1+2+3)
 ├── vad_service.py                  # Voice Activity Detection
 ├── langid_service.py               # Language/domain identification
 ├── whisper_service.py              # Legacy Whisper service
+├── script_converter.py             # Script conversion service (Phase 3)
 ├── file_manager.py                 # File operations and logging
 ├── config.py                       # Configuration settings
 ├── models.py                       # Data models (Segment, ASRResult, etc.)
 ├── errors.py                       # Custom exceptions
+├── data/
+│   ├── __init__.py
+│   ├── script_mappings.py          # Unicode mapping tables (Phase 3)
+│   └── gurmukhi_normalizer.py      # Gurmukhi diacritic normalization (Phase 5)
 ├── asr/
 │   ├── __init__.py
 │   ├── asr_whisper.py              # ASR-A: Whisper Large
@@ -197,8 +221,17 @@ KathaTranscription/
 ├── requirements.txt                # Python dependencies
 ├── test_phase1.py                  # Phase 1 test suite
 ├── test_phase2.py                  # Phase 2 test suite
+├── test_phase3.py                  # Phase 3 comprehensive test suite
+├── test_phase4_milestone1.py       # Phase 4 milestone 1 tests
+├── test_phase4_milestone2.py       # Phase 4 milestone 2 tests
+├── test_phase4_quotes.py          # Phase 4 quote detection tests
+├── test_phase5.py                  # Phase 5 comprehensive test suite
 ├── PHASE2_COMPLETION_REPORT.md     # Phase 2 completion documentation
 ├── PHASE2_TEST_RESULTS.md          # Phase 2 test results
+├── PHASE3_COMPLETION_REPORT.md     # Phase 3 completion documentation
+├── PHASE3_TEST_RESULTS.md          # Phase 3 test results
+├── PHASE4_COMPLETION_REPORT.md     # Phase 4 completion documentation
+├── PHASE5_COMPLETION_REPORT.md     # Phase 5 completion documentation
 └── README.md                       # This file
 ```
 
@@ -225,13 +258,30 @@ python test_phase1.py
 python test_phase2.py
 ```
 
+### Phase 3 Tests
+```bash
+python test_phase3.py
+```
+
+### Phase 4 Tests
+```bash
+python -m pytest test_phase4_milestone1.py test_phase4_milestone2.py test_phase4_quotes.py -v
+```
+
+### Phase 5 Tests
+```bash
+python test_phase5.py
+```
+
 Tests include:
 - Module imports
 - Data model validation
-- Fusion service logic
-- ASR engine initialization
+- Script detection
+- Shahmukhi to Gurmukhi conversion
+- Gurmukhi to Roman transliteration
+- ScriptConverter service
 - Orchestrator integration
-- End-to-end pipeline
+- End-to-end conversion pipeline
 
 ## Output Files
 
@@ -241,8 +291,17 @@ Plain text files containing the transcription.
 ### JSON Files (`outputs/json/`)
 Structured data with:
 - `filename`: Original filename
-- `transcription`: Transcription text
+- `transcription`: Object with `gurmukhi` and `roman` fields (Phase 3)
 - `timestamp`: Processing timestamp
+- `segments`: Array of segments, each with:
+  - `text`: Gurmukhi text
+  - `gurmukhi`: Gurmukhi representation (Phase 3)
+  - `roman`: Roman transliteration (Phase 3)
+  - `original_script`: Detected original script (Phase 3)
+  - `script_confidence`: Conversion confidence (Phase 3)
+  - `start`, `end`: Timestamps
+  - `confidence`: ASR confidence
+  - `language`: Detected language
 - `metadata`: Language, segments, etc.
 
 ### Log File (`logs/processed_files.json`)
@@ -353,25 +412,30 @@ This project is provided as-is for personal use.
 - Re-decode policy for low-confidence segments
 - Hybrid execution (ASR-A immediate, ASR-B/C parallel)
 
-### Phase 3: Scripture Services (Planned)
-- ShabadOS SGGS database integration
-- Dasam Granth database
-- Unified scripture service API
+### Phase 3: Script Conversion ✅
+- Automatic script detection (Shahmukhi, Gurmukhi, English, Devanagari, mixed)
+- Shahmukhi to Gurmukhi conversion with common word dictionary
+- Gurmukhi to Roman transliteration (ISO 15919, IAST, practical schemes)
+- Dual-output generation (Gurmukhi + Roman)
+- Integrated into transcription pipeline
+- Confidence scoring and review flagging
 
-### Phase 4: Quote Detection + Matching (Planned)
-- High-recall quote candidate detection
-- Assisted matching (fuzzy + semantic + verifier)
-- Canonical text replacement with metadata
-
-### Phase 5: Normalization + Transliteration (Planned)
-- Gurmukhi-first script normalization
-- Roman transliteration pipeline
+### Phase 4: Scripture Services + Quote Detection ✅
+- ShabadOS SGGS database integration with flexible schema detection
+- Dasam Granth database with auto-creation
+- Unified scripture service API for all sources
+- High-recall quote candidate detection (route, patterns, vocabulary)
+- Assisted matching with 3-stage verification (fuzzy + semantic + verifier)
+- Canonical text replacement with metadata (Ang, Raag, Author, Source)
+- Provenance preservation (original spoken text kept)
 
 ## Notes
 
 - First run will download Whisper models (can take a few minutes)
 - Models are cached in `~/.cache/whisper/` (local) or Docker volume (Docker)
 - Phase 2 uses multiple ASR engines - may require more GPU memory
+- Phase 3 script conversion is automatic and adds minimal processing time
 - Large audio files may take significant time to process
 - Processing time depends on model size, number of ASR engines, and hardware
 - See `PHASE2_COMPLETION_REPORT.md` for Phase 2 implementation details
+- See `PHASE3_COMPLETION_REPORT.md` for Phase 3 implementation details

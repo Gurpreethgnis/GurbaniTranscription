@@ -69,13 +69,72 @@ HOST = os.getenv("FLASK_HOST", "0.0.0.0")
 PORT = int(os.getenv("FLASK_PORT", "5000"))
 DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
 
+# Phase 3: Script Conversion Configuration
+# Confidence threshold for script conversion (0.0-1.0)
+# Segments below this threshold will be flagged for review
+SCRIPT_CONVERSION_CONFIDENCE_THRESHOLD = float(
+    os.getenv("SCRIPT_CONVERSION_CONFIDENCE_THRESHOLD", "0.7")
+)
+
+# Roman transliteration scheme
+# Options: "iso15919" (academic), "iast" (Sanskrit-based), "practical" (simplified)
+ROMAN_TRANSLITERATION_SCHEME = os.getenv("ROMAN_TRANSLITERATION_SCHEME", "practical")
+
+# Enable dictionary lookup for common words (improves accuracy)
+ENABLE_DICTIONARY_LOOKUP = os.getenv("ENABLE_DICTIONARY_LOOKUP", "true").lower() == "true"
+
+# Unicode normalization form
+# Options: "NFC" (Canonical Composition), "NFD" (Canonical Decomposition),
+#          "NFKC" (Compatibility Composition), "NFKD" (Compatibility Decomposition)
+UNICODE_NORMALIZATION_FORM = os.getenv("UNICODE_NORMALIZATION_FORM", "NFC")
+
+# Phase 4: Scripture Services + Quote Detection Configuration
+# Paths to scripture databases
+DATA_DIR = BASE_DIR / "data"
+
+# SGGS database path - supports both .db and .sqlite extensions
+# Can be overridden with SCRIPTURE_DB_PATH environment variable
+_scripture_db_path = os.getenv("SCRIPTURE_DB_PATH")
+if _scripture_db_path:
+    SCRIPTURE_DB_PATH = Path(_scripture_db_path)
+else:
+    # Try .sqlite first (common for ShabadOS), then .db
+    sggs_sqlite = DATA_DIR / "sggs.sqlite"
+    sggs_db = DATA_DIR / "sggs.db"
+    if sggs_sqlite.exists():
+        SCRIPTURE_DB_PATH = sggs_sqlite
+    elif sggs_db.exists():
+        SCRIPTURE_DB_PATH = sggs_db
+    else:
+        # Default to .db if neither exists (will raise error when used)
+        SCRIPTURE_DB_PATH = sggs_db
+
+# Dasam Granth database path
+DASAM_DB_PATH = Path(os.getenv("DASAM_DB_PATH", str(DATA_DIR / "dasam.db")))
+
+# Quote matching confidence threshold (0.0-1.0)
+# Matches with confidence >= this threshold will be auto-replaced with canonical text
+# Matches with confidence 0.70-0.89 will be flagged for review
+# Matches with confidence < 0.70 will not be replaced
+QUOTE_MATCH_CONFIDENCE_THRESHOLD = float(
+    os.getenv("QUOTE_MATCH_CONFIDENCE_THRESHOLD", "0.90")
+)
+
+# Quote candidate detection settings
+QUOTE_CANDIDATE_MIN_WORDS = int(
+    os.getenv("QUOTE_CANDIDATE_MIN_WORDS", "3")
+)  # Minimum words to consider as quote candidate
+
+# N-gram size for fast fuzzy search in scripture database
+NGRAM_SIZE = int(os.getenv("NGRAM_SIZE", "3"))  # Size of n-grams for indexing
+
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_FILE_ENABLED = os.getenv("LOG_FILE_ENABLED", "true").lower() == "true"
 
 # Create directories if they don't exist
-for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR]:
+for directory in [UPLOAD_DIR, TRANSCRIPTIONS_DIR, JSON_DIR, LOGS_DIR, DATA_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # Setup logging

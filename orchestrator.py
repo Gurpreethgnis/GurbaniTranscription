@@ -21,6 +21,10 @@ from asr.asr_whisper import ASRWhisper
 from asr.asr_indic import ASRIndic
 from asr.asr_english_fallback import ASREnglish
 from asr.asr_fusion import ASRFusion
+from script_converter import ScriptConverter
+from quotes.quote_candidates import QuoteCandidateDetector
+from quotes.assisted_matcher import AssistedMatcher
+from quotes.canonical_replacer import CanonicalReplacer
 from errors import ASREngineError, VADError, FusionError
 
 logger = logging.getLogger(__name__)
@@ -73,6 +77,19 @@ class Orchestrator:
         
         # Initialize fusion service
         self.fusion_service = fusion_service or ASRFusion()
+        
+        # Phase 3: Initialize script converter
+        self.script_converter = ScriptConverter(
+            roman_scheme=getattr(config, 'ROMAN_TRANSLITERATION_SCHEME', 'practical'),
+            enable_dictionary_lookup=getattr(config, 'ENABLE_DICTIONARY_LOOKUP', True)
+        )
+        logger.info("ScriptConverter initialized for Phase 3")
+        
+        # Phase 4: Initialize quote detection services
+        self.quote_detector = QuoteCandidateDetector()
+        self.quote_matcher = AssistedMatcher()
+        self.quote_replacer = CanonicalReplacer()
+        logger.info("Quote detection services initialized for Phase 4")
         
         # Create LangID service with ASR-A for quick detection
         if langid_service is None:
@@ -147,6 +164,9 @@ class Orchestrator:
                 
                 processed_segments.append(processed_segment)
                 total_gurmukhi_text += processed_segment.text + " "
+                # Add roman text if available
+                if processed_segment.roman:
+                    total_roman_text += processed_segment.roman + " "
                 
                 if processed_segment.needs_review:
                     logger.warning(f"[{job_id}] Chunk {i+1} flagged for review (confidence: {processed_segment.confidence:.2f})")
@@ -179,6 +199,17 @@ class Orchestrator:
             if processed_segments else 0.0
         )
         
+        # Calculate quote statistics (Phase 4)
+        quotes_detected = sum(1 for seg in processed_segments if seg.quote_match is not None)
+        quotes_replaced = sum(
+            1 for seg in processed_segments 
+            if seg.quote_match is not None and seg.type == "scripture_quote"
+        )
+        quotes_flagged_review = sum(
+            1 for seg in processed_segments 
+            if seg.quote_match is not None and seg.needs_review
+        )
+        
         metrics = {
             "mode": mode,
             "job_id": job_id,
@@ -189,7 +220,10 @@ class Orchestrator:
             "routes": {
                 route: sum(1 for seg in processed_segments if seg.route == route)
                 for route in [ROUTE_PUNJABI_SPEECH, ROUTE_ENGLISH_SPEECH, "scripture_quote_likely", "mixed"]
-            }
+            },
+            "quotes_detected": quotes_detected,
+            "quotes_replaced": quotes_replaced,
+            "quotes_flagged_review": quotes_flagged_review
         }
         
         logger.info(f"[{job_id}] Transcription completed: {len(processed_segments)} segments, "
@@ -279,29 +313,92 @@ class Orchestrator:
                 )
                 logger.info(f"[{job_id}] Re-decode completed, new confidence: {fusion_result.fused_confidence:.2f}")
         
-        # Step 7: Create processed segment
-        segment_type = "scripture_quote" if route == ROUTE_SCRIPTURE_QUOTE_LIKELY else "speech"
+        # Step 7: Phase 3 - Apply script conversion
+        logger.debug(f"[{job_id}] Applying script conversion to fused text...")
+        try:
+            converted = self.script_converter.convert(
+                fusion_result.fused_text,
+                source_language=asr_a_result.language
+            )
+            logger.debug(
+                f"[{job_id}] Script conversion: {converted.original_script} → Gurmukhi "
+                f"(confidence: {converted.confidence:.2f})"
+            )
+        except Exception as e:
+            logger.error(f"[{job_id}] Script conversion failed: {e}", exc_info=True)
+            # Fallback: use original text as Gurmukhi, no Roman
+            converted = None
         
+        # Step 8: Phase 4 - Quote Detection + Matching
+        # Create temporary segment for quote detection
+        temp_segment = ProcessedSegment(
+            start=chunk.start_time,
+            end=chunk.end_time,
+            route=route,
+            type="speech",  # Will be updated if quote found
+            text=converted.gurmukhi if converted else fusion_result.fused_text,
+            confidence=fusion_result.fused_confidence,
+            language=asr_a_result.language,
+            hypotheses=fusion_result.hypotheses,
+            needs_review=False,
+            roman=converted.roman if converted else None,
+            original_script=converted.original_script if converted else None,
+            script_confidence=converted.confidence if converted else None
+        )
+        
+        # Detect quote candidates and match if route suggests scripture
+        if route == ROUTE_SCRIPTURE_QUOTE_LIKELY:
+            logger.debug(f"[{job_id}] Detecting quote candidates...")
+            try:
+                candidates = self.quote_detector.detect_candidates(
+                    temp_segment,
+                    hypotheses=fusion_result.hypotheses
+                )
+                
+                if candidates:
+                    logger.debug(f"[{job_id}] Found {len(candidates)} quote candidate(s)")
+                    
+                    # Try to find a match
+                    quote_match = self.quote_matcher.find_match(
+                        candidates,
+                        hypotheses=fusion_result.hypotheses,
+                        source=None  # Search all sources
+                    )
+                    
+                    if quote_match:
+                        logger.info(
+                            f"[{job_id}] Quote match found: {quote_match.line_id} "
+                            f"(confidence: {quote_match.confidence:.2f})"
+                        )
+                        # Replace with canonical text
+                        temp_segment = self.quote_replacer.replace_with_canonical(
+                            temp_segment,
+                            quote_match
+                        )
+                    else:
+                        logger.debug(f"[{job_id}] No quote match found for candidates")
+                else:
+                    logger.debug(f"[{job_id}] No quote candidates detected")
+            except Exception as e:
+                logger.error(f"[{job_id}] Quote detection/matching failed: {e}", exc_info=True)
+                # Continue with original text - don't fail the whole segment
+        
+        # Step 9: Create final processed segment (use temp_segment, update needs_review)
+        # Update needs_review based on all factors
         needs_review = (
             fusion_result.fused_confidence < (
                 config.SEGMENT_CONFIDENCE_THRESHOLD 
                 if hasattr(config, 'SEGMENT_CONFIDENCE_THRESHOLD') 
                 else 0.7
             ) or
-            fusion_result.agreement_score < 0.5  # Low agreement also flags review
+            fusion_result.agreement_score < 0.5 or  # Low agreement also flags review
+            (converted and converted.needs_review) or  # Script conversion review flag
+            temp_segment.needs_review  # Quote match review flag
         )
         
-        return ProcessedSegment(
-            start=chunk.start_time,
-            end=chunk.end_time,
-            route=route,
-            type=segment_type,
-            text=fusion_result.fused_text,
-            confidence=fusion_result.fused_confidence,
-            language=asr_a_result.language,  # Use primary engine's language
-            hypotheses=fusion_result.hypotheses,
-            needs_review=needs_review
-        )
+        temp_segment.needs_review = needs_review
+        
+        return temp_segment
     
     def _get_engines_for_route(self, route: str) -> List[str]:
         """

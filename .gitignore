@@ -40,3 +40,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+data/sggs.sqlite
+data/dasam.db

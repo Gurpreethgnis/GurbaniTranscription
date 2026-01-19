@@ -12,8 +12,9 @@ services:
       # Mount templates and static for live reload
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
-      # Cache Whisper models (optional, but speeds up restarts)
-      - whisper-cache:/root/.cache/whisper
+      # Cache Whisper models (faster-whisper uses HuggingFace cache)
+      # Mount entire .cache directory to persist all caches (HuggingFace, pip, etc.)
+      - whisper-cache:/root/.cache
     environment:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1

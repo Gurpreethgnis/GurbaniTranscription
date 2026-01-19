@@ -429,6 +429,12 @@ This project is provided as-is for personal use.
 - Canonical text replacement with metadata (Ang, Raag, Author, Source)
 - Provenance preservation (original spoken text kept)
 
+### Phase 5: Normalization + Transliteration Gap Filling ✅
+- Comprehensive Gurmukhi diacritic normalization (tippi/bindi, adhak, nukta)
+- ShabadOS transliteration retrieval for canonical quotes
+- Consistent Unicode normalization using config.UNICODE_NORMALIZATION_FORM
+- Canonical quote transliteration flows through to final output
+
 ## Notes
 
 - First run will download Whisper models (can take a few minutes)

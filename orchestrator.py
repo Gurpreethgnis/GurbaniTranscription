@@ -8,8 +8,10 @@ Phase 2: Supports multi-ASR ensemble with fusion.
 """
 import logging
 import uuid
+import tempfile
+import io
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed
 import config
 from models import (
@@ -48,7 +50,8 @@ class Orchestrator:
         asr_service: Optional[ASRWhisper] = None,
         asr_indic: Optional[ASRIndic] = None,
         asr_english: Optional[ASREnglish] = None,
-        fusion_service: Optional[ASRFusion] = None
+        fusion_service: Optional[ASRFusion] = None,
+        live_callback: Optional[Callable] = None
     ):
         """
         Initialize orchestrator with services.
@@ -60,6 +63,9 @@ class Orchestrator:
             asr_indic: ASR-B Indic service instance (created if None)
             asr_english: ASR-C English service instance (created if None)
             fusion_service: Fusion service instance (created if None)
+            live_callback: Callback for live mode events
+                          Signature: (event_type: str, data: Dict[str, Any]) -> None
+                          event_type: "draft" or "verified"
         """
         self.vad_service = vad_service or VADService(
             aggressiveness=config.VAD_AGGRESSIVENESS if hasattr(config, 'VAD_AGGRESSIVENESS') else 2,
@@ -104,6 +110,12 @@ class Orchestrator:
         # Parallel execution settings
         self.parallel_execution = getattr(config, 'ASR_PARALLEL_EXECUTION', True)
         self.asr_timeout = getattr(config, 'ASR_TIMEOUT_SECONDS', 60)
+        
+        # Phase 6: Live mode callback
+        self.live_callback = live_callback
+        
+        # Phase 6: Live mode callback
+        self.live_callback = live_callback
     
     def transcribe_file(
         self,
@@ -236,6 +248,93 @@ class Orchestrator:
             metrics=metrics
         )
     
+    def process_live_audio_chunk(
+        self,
+        audio_bytes: bytes,
+        start_time: float,
+        end_time: float,
+        session_id: str,
+        job_id: Optional[str] = None
+    ) -> Optional[ProcessedSegment]:
+        """
+        Process a single audio chunk for live mode.
+        
+        Phase 6: Live mode processing that emits draft and verified events.
+        
+        Args:
+            audio_bytes: Raw audio data (WAV format expected)
+            start_time: Start timestamp in seconds (relative to session start)
+            end_time: End timestamp in seconds
+            session_id: Client session identifier
+            job_id: Optional job identifier for logging
+        
+        Returns:
+            ProcessedSegment if successful, None on error
+        """
+        # Store session_id for callback
+        self._current_session_id = session_id
+        """
+        Process a single audio chunk for live mode.
+        
+        Phase 6: Live mode processing that emits draft and verified events.
+        
+        Args:
+            audio_bytes: Raw audio data (WAV format expected)
+            start_time: Start timestamp in seconds (relative to session start)
+            end_time: End timestamp in seconds
+            session_id: Client session identifier
+            job_id: Optional job identifier for logging
+        
+        Returns:
+            ProcessedSegment if successful, None on error
+        """
+        if job_id is None:
+            job_id = f"live_{session_id[:8]}"
+        
+        logger.debug(f"[{job_id}] Processing live audio chunk: {start_time:.2f}-{end_time:.2f}s")
+        
+        # Create temporary file from audio bytes
+        try:
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                tmp_file.write(audio_bytes)
+                tmp_path = Path(tmp_file.name)
+            
+            # Create AudioChunk
+            duration = end_time - start_time
+            chunk = AudioChunk(
+                start_time=start_time,
+                end_time=end_time,
+                audio_path=tmp_path,
+                duration=duration
+            )
+            
+            # Identify route
+            route = self.langid_service.identify_segment(chunk)
+            language = self.langid_service.get_language_code(route)
+            
+            # Process chunk (will emit draft/verified via callback)
+            processed_segment = self._process_chunk_with_fusion(
+                chunk, route, language, job_id
+            )
+            
+            # Clean up temporary file
+            try:
+                tmp_path.unlink()
+            except Exception as e:
+                logger.warning(f"[{job_id}] Failed to delete temp file: {e}")
+            
+            return processed_segment
+            
+        except Exception as e:
+            logger.error(f"[{job_id}] Error processing live audio chunk: {e}", exc_info=True)
+            if self.live_callback:
+                self.live_callback("error", {
+                    "message": f"Processing error: {str(e)}",
+                    "start": start_time,
+                    "end": end_time
+                })
+            return None
+    
     def _process_chunk_with_fusion(
         self,
         chunk: AudioChunk,
@@ -269,6 +368,28 @@ class Orchestrator:
                 route=route
             )
             logger.debug(f"[{job_id}] ASR-A completed: confidence={asr_a_result.confidence:.2f}")
+            
+            # Phase 6: Emit draft caption for live mode
+            if self.live_callback:
+                segment_id = f"seg_{chunk.start_time:.2f}_{chunk.end_time:.2f}"
+                try:
+                    # Quick script conversion for draft (may be incomplete)
+                    draft_converted = self.script_converter.convert(
+                        asr_a_result.text,
+                        source_language=asr_a_result.language
+                    )
+                    self.live_callback("draft", {
+                        "session_id": getattr(self, '_current_session_id', 'unknown'),
+                        "segment_id": segment_id,
+                        "start": chunk.start_time,
+                        "end": chunk.end_time,
+                        "text": asr_a_result.text,
+                        "gurmukhi": draft_converted.gurmukhi if draft_converted else asr_a_result.text,
+                        "roman": draft_converted.roman if draft_converted else None,
+                        "confidence": asr_a_result.confidence
+                    })
+                except Exception as e:
+                    logger.warning(f"[{job_id}] Failed to emit draft caption: {e}")
         except Exception as e:
             logger.error(f"[{job_id}] ASR-A failed: {e}")
             raise ASREngineError("asr_a", str(e))
@@ -397,6 +518,35 @@ class Orchestrator:
         )
         
         temp_segment.needs_review = needs_review
+        
+        # Phase 6: Emit verified update for live mode
+        if self.live_callback:
+            segment_id = f"seg_{chunk.start_time:.2f}_{chunk.end_time:.2f}"
+            try:
+                quote_match_data = None
+                if temp_segment.quote_match:
+                    quote_match_data = {
+                        "source": temp_segment.quote_match.source.value if hasattr(temp_segment.quote_match.source, 'value') else str(temp_segment.quote_match.source),
+                        "line_id": temp_segment.quote_match.line_id,
+                        "ang": temp_segment.quote_match.ang,
+                        "raag": temp_segment.quote_match.raag,
+                        "author": temp_segment.quote_match.author,
+                        "confidence": temp_segment.quote_match.confidence
+                    }
+                
+                self.live_callback("verified", {
+                    "session_id": getattr(self, '_current_session_id', 'unknown'),
+                    "segment_id": segment_id,
+                    "start": chunk.start_time,
+                    "end": chunk.end_time,
+                    "gurmukhi": temp_segment.text,
+                    "roman": temp_segment.roman or "",
+                    "confidence": temp_segment.confidence,
+                    "quote_match": quote_match_data,
+                    "needs_review": temp_segment.needs_review
+                })
+            except Exception as e:
+                logger.warning(f"[{job_id}] Failed to emit verified update: {e}")
         
         return temp_segment
     

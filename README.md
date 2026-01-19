@@ -40,6 +40,21 @@ A production-grade system for transcribing Katha (Sikh religious discourse) with
 - **Consistent Unicode Normalization**: Applied throughout pipeline using config.UNICODE_NORMALIZATION_FORM
 - **Canonical Quote Transliteration**: Database transliteration flows through to final output
 
+### Phase 6: Live Mode + WebSocket UI ✅
+- **WebSocket Server**: Flask-SocketIO integration for real-time communication
+- **Live Audio Streaming**: Browser microphone capture with MediaRecorder API
+- **Draft Captions**: Immediate ASR-A output (< 2s latency)
+- **Verified Updates**: Post-quote-detection updates (< 5s latency)
+- **Real-time Display**: Live transcript with Gurmukhi/Roman toggle
+- **Quote Highlighting**: Visual distinction with metadata tooltips
+- **Session Management**: Multi-session support with error handling
+
+### Phase 5: Normalization + Transliteration Gap Filling ✅
+- **Gurmukhi Diacritic Normalization**: Tippi/Bindi, Adhak, Nukta normalization
+- **ShabadOS Transliteration Retrieval**: Roman transliteration from database for canonical quotes
+- **Consistent Unicode Normalization**: Applied throughout pipeline using config.UNICODE_NORMALIZATION_FORM
+- **Canonical Quote Transliteration**: Database transliteration flows through to final output
+
 ### General Features
 - **Multi-file Processing**: Select and process multiple audio files
 - **Two Processing Modes**: 
@@ -226,6 +241,10 @@ KathaTranscription/
 ├── test_phase4_milestone2.py       # Phase 4 milestone 2 tests
 ├── test_phase4_quotes.py          # Phase 4 quote detection tests
 ├── test_phase5.py                  # Phase 5 comprehensive test suite
+├── test_phase6.py                  # Phase 6 comprehensive test suite
+├── ui/                             # Phase 6: Live mode UI
+│   ├── __init__.py
+│   └── websocket_server.py         # WebSocket server
 ├── PHASE2_COMPLETION_REPORT.md     # Phase 2 completion documentation
 ├── PHASE2_TEST_RESULTS.md          # Phase 2 test results
 ├── PHASE3_COMPLETION_REPORT.md     # Phase 3 completion documentation
@@ -238,6 +257,7 @@ KathaTranscription/
 ## API Endpoints
 
 - `GET /` - Main application page
+- `GET /live` - Live transcription page (Phase 6)
 - `GET /status` - Server and model status
 - `POST /upload` - Upload audio file
 - `POST /transcribe` - Transcribe single file (legacy)
@@ -245,6 +265,19 @@ KathaTranscription/
 - `POST /transcribe-batch` - Transcribe multiple files
 - `GET /log` - Get processing log
 - `GET /download/<filename>` - Download transcription file
+
+### WebSocket Events (Phase 6)
+
+**Client → Server:**
+- `audio_chunk` - Send audio chunk for processing
+- `ping` - Keep-alive ping
+
+**Server → Client:**
+- `connected` - Connection established
+- `draft_caption` - Draft transcription (ASR-A output)
+- `verified_update` - Verified transcription (after quote detection)
+- `error` - Error message
+- `chunk_received` - Audio chunk acknowledgment
 
 ## Testing
 
@@ -271,6 +304,11 @@ python -m pytest test_phase4_milestone1.py test_phase4_milestone2.py test_phase4
 ### Phase 5 Tests
 ```bash
 python test_phase5.py
+```
+
+### Phase 6 Tests
+```bash
+python test_phase6.py
 ```
 
 Tests include:
@@ -435,6 +473,25 @@ This project is provided as-is for personal use.
 - Consistent Unicode normalization using config.UNICODE_NORMALIZATION_FORM
 - Canonical quote transliteration flows through to final output
 
+### Phase 6: Live Mode + WebSocket UI ✅
+- WebSocket server infrastructure with Flask-SocketIO
+- Real-time audio streaming from browser microphone
+- Draft captions (immediate ASR-A output) with < 2s latency
+- Verified updates (after quote detection) with < 5s latency
+- Live transcript display with Gurmukhi/Roman/Both toggle
+- Quote highlighting with metadata (Ang, Raag, Author)
+- Session management and error handling
+
+### Phase 6: Live Mode + WebSocket UI ✅
+- WebSocket server infrastructure with Flask-SocketIO
+- Real-time audio streaming from browser microphone
+- Draft captions (immediate ASR-A output) with < 2s latency
+- Verified updates (after quote detection) with < 5s latency
+- Live transcript display with Gurmukhi/Roman/Both toggle
+- Quote highlighting with metadata (Ang, Raag, Author)
+- Session management and error handling
+- Browser-based audio capture using MediaRecorder API
+
 ## Notes
 
 - First run will download Whisper models (can take a few minutes)
@@ -445,3 +502,6 @@ This project is provided as-is for personal use.
 - Processing time depends on model size, number of ASR engines, and hardware
 - See `PHASE2_COMPLETION_REPORT.md` for Phase 2 implementation details
 - See `PHASE3_COMPLETION_REPORT.md` for Phase 3 implementation details
+- See `PHASE4_COMPLETION_REPORT.md` for Phase 4 implementation details
+- See `PHASE5_COMPLETION_REPORT.md` for Phase 5 implementation details
+- See `PHASE6_COMPLETION_REPORT.md` for Phase 6 implementation details

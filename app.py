@@ -5,7 +5,7 @@ import os
 import time
 import threading
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context, render_template
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import config
@@ -13,6 +13,7 @@ from whisper_service import get_whisper_service
 from file_manager import FileManager
 from audio_utils import get_audio_duration
 from orchestrator import Orchestrator
+from ui.websocket_server import WebSocketServer
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = config.MAX_FILE_SIZE_MB * 1024 * 1024  # Convert MB to bytes
@@ -21,9 +22,14 @@ app.config['MAX_CONTENT_LENGTH'] = config.MAX_FILE_SIZE_MB * 1024 * 1024  # Conv
 file_manager = FileManager()
 whisper_service = None
 orchestrator = None
+live_orchestrator = None  # Phase 6: Separate orchestrator for live mode
+websocket_server = None  # Phase 6: WebSocket server
 
 # Progress tracking for active transcriptions
 progress_store = {}
+
+# Phase 6: Live session tracking
+live_sessions = {}  # session_id -> {start_time, chunks_processed}
 
 
 def init_whisper():
@@ -54,10 +60,74 @@ def init_orchestrator():
     return orchestrator
 
 
+def init_live_orchestrator(websocket_server_instance):
+    """
+    Initialize Orchestrator for live mode with WebSocket callback.
+    
+    Phase 6: Live mode orchestrator with event callbacks.
+    """
+    global live_orchestrator
+    if live_orchestrator is None:
+        try:
+            print("Initializing Live Orchestrator (this may take a moment)...")
+            
+            def live_callback(event_type: str, data: dict):
+                """Callback for live mode events."""
+                if not websocket_server_instance:
+                    return
+                
+                session_id = data.get('session_id', 'unknown')
+                
+                if event_type == 'draft':
+                    websocket_server_instance.emit_draft_caption(
+                        session_id=session_id,
+                        segment_id=data.get('segment_id', 'unknown'),
+                        start=data.get('start', 0.0),
+                        end=data.get('end', 0.0),
+                        text=data.get('text', ''),
+                        confidence=data.get('confidence', 0.0),
+                        gurmukhi=data.get('gurmukhi'),
+                        roman=data.get('roman')
+                    )
+                elif event_type == 'verified':
+                    websocket_server_instance.emit_verified_update(
+                        session_id=session_id,
+                        segment_id=data.get('segment_id', 'unknown'),
+                        start=data.get('start', 0.0),
+                        end=data.get('end', 0.0),
+                        gurmukhi=data.get('gurmukhi', ''),
+                        roman=data.get('roman', ''),
+                        confidence=data.get('confidence', 0.0),
+                        quote_match=data.get('quote_match'),
+                        needs_review=data.get('needs_review', False)
+                    )
+                elif event_type == 'error':
+                    websocket_server_instance.emit_error(
+                        session_id=session_id,
+                        message=data.get('message', 'Unknown error'),
+                        error_type=data.get('error_type', 'processing')
+                    )
+            
+            live_orchestrator = Orchestrator(live_callback=live_callback)
+            print("Live Orchestrator initialized successfully")
+        except Exception as e:
+            print(f"ERROR: Failed to initialize Live Orchestrator: {e}")
+            import traceback
+            traceback.print_exc()
+            live_orchestrator = None
+    return live_orchestrator
+
+
 @app.route('/')
 def index():
     """Serve the main HTML page."""
     return send_from_directory('templates', 'index.html')
+
+
+@app.route('/live')
+def live():
+    """Serve the live transcription page."""
+    return render_template('live.html')
 
 
 @app.route('/static/<path:filename>')
@@ -649,5 +719,54 @@ if __name__ == '__main__':
     
     print("\nInitializing Whisper service...")
     init_whisper()
-    print(f"Starting server on http://{config.HOST}:{config.PORT}")
-    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
+    
+    # Phase 6: Initialize WebSocket server and live orchestrator
+    print("\nInitializing WebSocket server for live mode...")
+    websocket_server = WebSocketServer(app, orchestrator_callback=None)
+    
+    # Initialize live orchestrator with WebSocket callback
+    def handle_audio_chunk(audio_bytes: bytes, session_id: str, chunk_data: dict):
+        """Handle audio chunk from WebSocket client."""
+        live_orch = init_live_orchestrator(websocket_server)
+        if not live_orch:
+            websocket_server.emit_error(session_id, "Live orchestrator not available")
+            return
+        
+        # Track session
+        if session_id not in live_sessions:
+            live_sessions[session_id] = {
+                'start_time': time.time(),
+                'chunks_processed': 0
+            }
+        
+        # Process audio chunk
+        start_time = chunk_data.get('start_time', 0.0)
+        end_time = chunk_data.get('end_time', start_time + 1.0)
+        
+        # Store session_id in data for callback
+        chunk_data['session_id'] = session_id
+        
+        # Process in background thread to avoid blocking
+        def process_chunk():
+            try:
+                result = live_orch.process_live_audio_chunk(
+                    audio_bytes=audio_bytes,
+                    start_time=start_time,
+                    end_time=end_time,
+                    session_id=session_id
+                )
+                live_sessions[session_id]['chunks_processed'] += 1
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Error processing live chunk: {e}", exc_info=True)
+                websocket_server.emit_error(session_id, f"Processing error: {str(e)}")
+        
+        thread = threading.Thread(target=process_chunk)
+        thread.daemon = True
+        thread.start()
+    
+    # Update WebSocket server callback
+    websocket_server.orchestrator_callback = handle_audio_chunk
+    
+    print(f"Starting server with WebSocket support on http://{config.HOST}:{config.PORT}")
+    websocket_server.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

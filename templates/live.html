@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Katha Transcription</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .live-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.recording {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .transcript-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+        .segment {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 3px solid #007bff;
+            background: white;
+            border-radius: 3px;
+        }
+        .segment.draft {
+            border-left-color: #ffc107;
+            opacity: 0.7;
+        }
+        .segment.verified {
+            border-left-color: #28a745;
+        }
+        .segment.quote {
+            border-left-color: #6f42c1;
+            background: #f0e6ff;
+        }
+        .segment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .segment-text {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .segment-roman {
+            font-size: 14px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .quote-metadata {
+            font-size: 12px;
+            color: #6f42c1;
+            margin-top: 5px;
+        }
+        .confidence-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .confidence-high {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .confidence-medium {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .confidence-low {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .output-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .toggle-btn {
+            padding: 5px 15px;
+            border: 1px solid #dee2e6;
+            background: white;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .toggle-btn.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="live-container">
+        <h1>Live Katha Transcription</h1>
+        
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">Start Recording</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>Stop Recording</button>
+            <div class="output-toggle">
+                <button class="toggle-btn active" data-output="gurmukhi">Gurmukhi</button>
+                <button class="toggle-btn" data-output="roman">Roman</button>
+                <button class="toggle-btn" data-output="both">Both</button>
+            </div>
+        </div>
+        
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div class="transcript-area" id="transcriptArea">
+            <p style="color: #6c757d; text-align: center; margin-top: 50px;">
+                Click "Start Recording" to begin live transcription...
+            </p>
+        </div>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/live.js') }}"></script>
+</body>
+</html>

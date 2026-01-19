@@ -128,6 +128,13 @@ QUOTE_CANDIDATE_MIN_WORDS = int(
 # N-gram size for fast fuzzy search in scripture database
 NGRAM_SIZE = int(os.getenv("NGRAM_SIZE", "3"))  # Size of n-grams for indexing
 
+# Phase 6: Live Streaming Configuration
+LIVE_CHUNK_DURATION_MS = int(os.getenv("LIVE_CHUNK_DURATION_MS", "1000"))  # Audio chunk duration for streaming (ms)
+LIVE_DRAFT_DELAY_MS = int(os.getenv("LIVE_DRAFT_DELAY_MS", "100"))  # Delay before sending draft caption (ms)
+LIVE_VERIFIED_DELAY_S = float(os.getenv("LIVE_VERIFIED_DELAY_S", "2.0"))  # Seconds behind for verified processing
+WEBSOCKET_PING_INTERVAL = int(os.getenv("WEBSOCKET_PING_INTERVAL", "25"))  # Ping interval in seconds
+WEBSOCKET_PING_TIMEOUT = int(os.getenv("WEBSOCKET_PING_TIMEOUT", "120"))  # Timeout for WebSocket connections (seconds)
+
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

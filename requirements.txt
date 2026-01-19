@@ -32,3 +32,9 @@ numpy>=1.24.0
 # Phase 2: Multi-ASR + Fusion
 rapidfuzz>=3.0.0              # Fast fuzzy string matching
 python-Levenshtein>=0.21.0    # Levenshtein distance for alignment
+
+# Phase 6: Live Streaming (WebSocket)
+flask-socketio>=5.3.0          # Flask WebSocket support
+python-socketio>=5.10.0       # Socket.IO Python client/server
+python-engineio>=4.8.0        # Engine.IO Python implementation
+eventlet>=0.35.0              # Async networking library for WebSocket

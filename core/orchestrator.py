@@ -43,6 +43,9 @@ from services.sggs_aligner import SGGSAligner, get_sggs_aligner
 from post.annotator import Annotator
 from post.document_formatter import DocumentFormatter
 from core.errors import ASREngineError, VADError, FusionError, AudioDenoiseError
+# Shabad Mode imports
+from services.shabad_detector import ShabadDetector, get_shabad_detector, ShabadDetectionResult, AudioMode
+from services.semantic_praman import SemanticPramanService, get_semantic_praman_service, PramanSearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +219,12 @@ class Orchestrator:
         
         # Store current processing options
         self.current_processing_options = None
+        
+        # Shabad Mode: Initialize shabad detection and praman services
+        self.shabad_detector = None
+        self.semantic_praman_service = None
+        self._shabad_mode_enabled = False
+        logger.info("Shabad mode services will be initialized on first use")
         
         logger.info(f"Orchestrator initialized with primary provider: {self.primary_provider_type}")
     
@@ -823,6 +832,294 @@ class Orchestrator:
                     "end": end_time
                 })
             return None
+    
+    def _init_shabad_services(self) -> bool:
+        """
+        Initialize shabad mode services on first use.
+        
+        Returns:
+            True if services initialized successfully
+        """
+        if self._shabad_mode_enabled:
+            return True
+        
+        try:
+            # Initialize shabad detector with SGGS database
+            from scripture.sggs_db import SGGSDatabase
+            try:
+                sggs_db = SGGSDatabase()
+            except Exception as e:
+                logger.warning(f"Failed to load SGGS database for shabad mode: {e}")
+                sggs_db = None
+            
+            self.shabad_detector = get_shabad_detector(sggs_db=sggs_db)
+            logger.info("Shabad detector initialized for shabad mode")
+            
+            # Initialize semantic praman service
+            semantic_index_path = getattr(config, 'SEMANTIC_INDEX_PATH', None)
+            self.semantic_praman_service = get_semantic_praman_service(semantic_index_path)
+            
+            # Build index if not already built
+            if self.semantic_praman_service.index is None and sggs_db:
+                logger.info("Building semantic praman index (this may take a moment)...")
+                self.semantic_praman_service.build_index(sggs_db=sggs_db)
+            
+            logger.info("Semantic praman service initialized for shabad mode")
+            
+            self._shabad_mode_enabled = True
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize shabad mode services: {e}", exc_info=True)
+            return False
+    
+    def process_shabad_audio_chunk(
+        self,
+        audio_bytes: bytes,
+        start_time: float,
+        end_time: float,
+        session_id: str,
+        similar_count: int = 5,
+        dissimilar_count: int = 3,
+        job_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Process audio chunk for shabad mode with praman suggestions.
+        
+        Args:
+            audio_bytes: Raw audio data (WAV format expected)
+            start_time: Start timestamp in seconds
+            end_time: End timestamp in seconds
+            session_id: Client session identifier
+            similar_count: Number of similar pramans to return
+            dissimilar_count: Number of dissimilar pramans to return
+            job_id: Optional job identifier for logging
+        
+        Returns:
+            Dictionary with shabad detection and praman results, or None on error
+        """
+        # Initialize shabad services if needed
+        if not self._init_shabad_services():
+            logger.error("Shabad mode services not available")
+            return None
+        
+        # Store session_id for callback
+        self._current_session_id = session_id
+        
+        if job_id is None:
+            job_id = f"shabad_{session_id[:8]}"
+        
+        logger.debug(f"[{job_id}] Processing shabad audio chunk: {start_time:.2f}-{end_time:.2f}s")
+        
+        # Apply aggressive denoising for shabad mode (kirtan has musical instruments)
+        working_audio_bytes = audio_bytes
+        shabad_denoise_strength = getattr(config, 'SHABAD_MODE_DENOISE_STRENGTH', 'aggressive')
+        
+        try:
+            from audio.denoiser import AudioDenoiser
+            denoiser = AudioDenoiser(
+                backend=getattr(config, 'DENOISE_BACKEND', 'noisereduce'),
+                strength=shabad_denoise_strength,
+                sample_rate=getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+            )
+            sample_rate = getattr(config, 'DENOISE_SAMPLE_RATE', 16000)
+            working_audio_bytes = denoiser.denoise_chunk(audio_bytes, sample_rate)
+            logger.debug(f"[{job_id}] Audio denoised with strength: {shabad_denoise_strength}")
+        except Exception as e:
+            logger.warning(f"[{job_id}] Shabad mode denoising failed: {e}. Using original audio.")
+            working_audio_bytes = audio_bytes
+        
+        try:
+            # Create temporary file from audio bytes
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                tmp_file.write(working_audio_bytes)
+                tmp_path = Path(tmp_file.name)
+            
+            # Create AudioChunk
+            duration = end_time - start_time
+            chunk = AudioChunk(
+                start_time=start_time,
+                end_time=end_time,
+                audio_path=tmp_path,
+                duration=duration
+            )
+            
+            # Get Gurbani prompt for better ASR
+            gurbani_prompt = None
+            if self.prompt_builder:
+                gurbani_prompt = self.prompt_builder.get_prompt(
+                    mode='sggs',
+                    context='scripture'
+                )
+            
+            # Transcribe with Gurbani-focused prompt
+            asr_result = self.asr_service.transcribe_chunk(
+                chunk,
+                language='pa',  # Punjabi
+                route=ROUTE_SCRIPTURE_QUOTE_LIKELY,
+                initial_prompt=gurbani_prompt
+            )
+            
+            transcribed_text = asr_result.text
+            logger.debug(f"[{job_id}] Transcribed: {transcribed_text[:100]}...")
+            
+            # Detect shabad and match line
+            detection_result = self.shabad_detector.detect(transcribed_text)
+            
+            # Prepare response
+            result = {
+                'session_id': session_id,
+                'start_time': start_time,
+                'end_time': end_time,
+                'transcribed_text': transcribed_text,
+                'asr_confidence': asr_result.confidence,
+                'audio_mode': detection_result.mode.value,
+                'mode_confidence': detection_result.mode_confidence,
+                'matched_line': None,
+                'next_line': None,
+                'shabad_info': None,
+                'similar_pramans': [],
+                'dissimilar_pramans': [],
+                'is_new_shabad': detection_result.is_new_shabad
+            }
+            
+            # If we matched a shabad line
+            if detection_result.matched_line:
+                matched = detection_result.matched_line
+                result['matched_line'] = {
+                    'line_id': matched.line_id,
+                    'gurmukhi': matched.gurmukhi,
+                    'roman': matched.roman,
+                    'line_number': matched.line_number,
+                    'total_lines': matched.total_lines,
+                    'ang': matched.ang,
+                    'raag': matched.raag,
+                    'author': matched.author,
+                    'shabad_id': matched.shabad_id
+                }
+                result['match_confidence'] = detection_result.match_confidence
+                
+                # Get next line prediction
+                if detection_result.shabad_context:
+                    next_line = detection_result.shabad_context.next_line
+                    if next_line:
+                        result['next_line'] = {
+                            'line_id': next_line.line_id,
+                            'gurmukhi': next_line.gurmukhi,
+                            'roman': next_line.roman,
+                            'line_number': next_line.line_number
+                        }
+                    
+                    # Shabad info
+                    result['shabad_info'] = {
+                        'shabad_id': detection_result.shabad_context.shabad_id,
+                        'current_line_index': detection_result.shabad_context.current_line_index,
+                        'total_lines': len(detection_result.shabad_context.lines),
+                        'is_at_end': detection_result.shabad_context.is_at_end()
+                    }
+                
+                # Find related pramans
+                if self.semantic_praman_service and self.semantic_praman_service.index is not None:
+                    try:
+                        praman_result = self.semantic_praman_service.search_pramans(
+                            matched.gurmukhi,
+                            similar_count=similar_count,
+                            dissimilar_count=dissimilar_count,
+                            exclude_same_shabad=True,
+                            current_shabad_id=matched.shabad_id
+                        )
+                        
+                        # Convert to serializable format
+                        result['similar_pramans'] = [
+                            {
+                                'line_id': p.line_id,
+                                'gurmukhi': p.gurmukhi,
+                                'roman': p.roman,
+                                'source': p.source,
+                                'ang': p.ang,
+                                'raag': p.raag,
+                                'author': p.author,
+                                'similarity_score': p.similarity_score,
+                                'shared_keywords': p.shared_keywords
+                            }
+                            for p in praman_result.similar_pramans
+                        ]
+                        
+                        result['dissimilar_pramans'] = [
+                            {
+                                'line_id': p.line_id,
+                                'gurmukhi': p.gurmukhi,
+                                'roman': p.roman,
+                                'source': p.source,
+                                'ang': p.ang,
+                                'raag': p.raag,
+                                'author': p.author,
+                                'similarity_score': p.similarity_score,
+                                'shared_keywords': p.shared_keywords
+                            }
+                            for p in praman_result.dissimilar_pramans
+                        ]
+                        
+                        logger.debug(
+                            f"[{job_id}] Found {len(result['similar_pramans'])} similar, "
+                            f"{len(result['dissimilar_pramans'])} dissimilar pramans"
+                        )
+                    except Exception as e:
+                        logger.warning(f"[{job_id}] Praman search failed: {e}")
+            
+            # Emit shabad update via callback
+            if self.live_callback:
+                self.live_callback("shabad_update", result)
+            
+            # Clean up temporary file
+            try:
+                tmp_path.unlink()
+            except Exception as e:
+                logger.warning(f"[{job_id}] Failed to delete temp file: {e}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"[{job_id}] Error processing shabad audio chunk: {e}", exc_info=True)
+            if self.live_callback:
+                self.live_callback("error", {
+                    "message": f"Shabad processing error: {str(e)}",
+                    "start": start_time,
+                    "end": end_time
+                })
+            return None
+    
+    def reset_shabad_context(self) -> None:
+        """Reset shabad tracking context for a new session."""
+        if self.shabad_detector:
+            self.shabad_detector.reset_context()
+            logger.debug("Shabad context reset")
+    
+    def get_shabad_context(self) -> Optional[Dict[str, Any]]:
+        """Get current shabad context for UI state."""
+        if not self.shabad_detector:
+            return None
+        
+        context = self.shabad_detector.get_current_context()
+        if not context:
+            return None
+        
+        return {
+            'shabad_id': context.shabad_id,
+            'current_line_index': context.current_line_index,
+            'total_lines': len(context.lines),
+            'current_line': {
+                'line_id': context.current_line.line_id,
+                'gurmukhi': context.current_line.gurmukhi,
+                'roman': context.current_line.roman
+            } if context.current_line else None,
+            'next_line': {
+                'line_id': context.next_line.line_id,
+                'gurmukhi': context.next_line.gurmukhi,
+                'roman': context.next_line.roman
+            } if context.next_line else None,
+            'is_at_end': context.is_at_end()
+        }
     
     def _process_chunk_with_fusion(
         self,

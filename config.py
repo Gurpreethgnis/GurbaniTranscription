@@ -236,6 +236,30 @@ DENOISE_SAMPLE_RATE = int(os.getenv("DENOISE_SAMPLE_RATE", "16000"))  # Standard
 DENOISE_AUTO_ENABLE_THRESHOLD = float(os.getenv("DENOISE_AUTO_ENABLE_THRESHOLD", "0.4"))
 
 # ============================================
+# SHABAD MODE SETTINGS (Phase 15)
+# ============================================
+
+# Shabad mode denoising - more aggressive for kirtan with instruments
+SHABAD_MODE_DENOISE_STRENGTH = os.getenv("SHABAD_MODE_DENOISE_STRENGTH", "aggressive")
+
+# Default number of pramans to suggest
+PRAMAN_DEFAULT_SIMILAR_COUNT = int(os.getenv("PRAMAN_DEFAULT_SIMILAR_COUNT", "5"))
+PRAMAN_DEFAULT_DISSIMILAR_COUNT = int(os.getenv("PRAMAN_DEFAULT_DISSIMILAR_COUNT", "3"))
+
+# Semantic embedding model for praman search
+EMBEDDING_MODEL_SEMANTIC = os.getenv(
+    "EMBEDDING_MODEL_SEMANTIC",
+    "paraphrase-multilingual-MiniLM-L12-v2"
+)
+
+# Semantic index path for praman search
+SEMANTIC_INDEX_PATH = DATA_DIR / "vectors" / "semantic_praman_index.faiss"
+
+# Shabad detection settings
+SHABAD_MATCH_THRESHOLD = float(os.getenv("SHABAD_MATCH_THRESHOLD", "0.70"))
+SHABAD_CONTEXT_WINDOW = int(os.getenv("SHABAD_CONTEXT_WINDOW", "5"))
+
+# ============================================
 # DOCUMENT FORMATTING / OUTPUT
 # ============================================
 

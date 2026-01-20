@@ -2390,3 +2390,682 @@ button .spin {
         align-items: stretch;
     }
 }
+
+/* ============================================
+   SHABAD MODE STYLES (Phase 15)
+   ============================================ */
+
+/* Container */
+.shabad-container {
+    padding: 0;
+    max-width: 100%;
+    height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.shabad-container .page-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.shabad-container .page-header h1 {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--color-text);
+    margin-bottom: 4px;
+}
+
+.shabad-container .subtitle {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Controls */
+.shabad-controls {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.shabad-controls .btn-primary,
+.shabad-controls .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.shabad-controls .btn-primary {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+}
+
+.shabad-controls .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-dark, #c5a72e);
+    transform: translateY(-1px);
+}
+
+.shabad-controls .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.shabad-controls .btn-secondary:hover:not(:disabled) {
+    background: var(--color-hover);
+}
+
+.shabad-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Status indicator */
+#shabadStatus {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+#shabadStatus.disconnected {
+    background: var(--color-error-bg, #fee2e2);
+    color: var(--color-error, #dc2626);
+}
+
+#shabadStatus.connected {
+    background: var(--color-success-bg, #dcfce7);
+    color: var(--color-success, #16a34a);
+}
+
+#shabadStatus.listening {
+    background: var(--color-primary-bg, #fef3c7);
+    color: var(--color-primary);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Error message */
+.shabad-container .error-message {
+    margin: 0 24px;
+    padding: 12px 16px;
+    background: var(--color-error-bg, #fee2e2);
+    color: var(--color-error, #dc2626);
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+/* Split View Layout */
+.shabad-split-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Upper Half: Current Shabad */
+.shabad-display-area {
+    flex: 0 0 45%;
+    max-height: 45%;
+    background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-bg) 100%);
+    border-bottom: 2px solid var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+}
+
+.shabad-current-line-wrapper {
+    text-align: center;
+    max-width: 900px;
+    width: 100%;
+}
+
+/* Mode Indicator */
+.shabad-mode-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border-radius: 20px;
+    background: var(--color-hover);
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+    transition: all 0.3s ease;
+}
+
+.shabad-mode-indicator.shabad-mode {
+    background: var(--color-primary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.shabad-mode-indicator.katha-mode {
+    background: var(--color-info-bg, #dbeafe);
+    color: var(--color-info, #2563eb);
+}
+
+.mode-icon {
+    font-size: 1.2rem;
+}
+
+/* Current Line Display */
+.shabad-line-display {
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shabad-line-display .current-line {
+    animation: fadeIn 0.5s ease;
+}
+
+.shabad-line-display .current-line.new-shabad {
+    animation: slideIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.shabad-line-display .gurmukhi-text {
+    font-family: var(--font-gurmukhi);
+    font-size: 2.5rem;
+    line-height: 1.4;
+    color: var(--color-text);
+    margin-bottom: 12px;
+}
+
+.shabad-line-display .roman-text {
+    font-family: var(--font-body);
+    font-size: 1.1rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.shabad-line-display .placeholder-text {
+    opacity: 0.5;
+}
+
+.shabad-line-display .line-placeholder .gurmukhi-text {
+    font-size: 1.5rem;
+}
+
+.shabad-line-display .line-placeholder .roman-text {
+    font-size: 1rem;
+}
+
+/* Next Line Display */
+.shabad-next-line {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--color-border);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.shabad-next-line:hover {
+    opacity: 1;
+}
+
+.next-line-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-secondary);
+    margin-bottom: 8px;
+}
+
+.next-line-content .gurmukhi-text {
+    font-family: var(--font-gurmukhi);
+    font-size: 1.3rem;
+    color: var(--color-text-secondary);
+}
+
+.next-line-content .gurmukhi-text.dim {
+    opacity: 0.5;
+}
+
+/* Shabad Metadata */
+.shabad-metadata {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 20px;
+    padding: 12px 20px;
+    background: var(--color-hover);
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+
+.metadata-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+.metadata-item svg {
+    opacity: 0.7;
+}
+
+/* Lower Half: Praman Suggestions */
+.praman-area {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg);
+}
+
+.praman-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.praman-header h2 {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    color: var(--color-text);
+    margin: 0;
+}
+
+.praman-filter-toggle {
+    display: flex;
+    gap: 8px;
+}
+
+.filter-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.filter-btn.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* Praman Panels Container */
+.praman-panels {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    padding: 16px 24px;
+    overflow: hidden;
+}
+
+/* Individual Praman Panel */
+.praman-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+}
+
+.praman-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--color-hover);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+}
+
+.praman-icon {
+    font-size: 1.1rem;
+}
+
+.praman-icon.similar {
+    color: var(--color-success, #16a34a);
+}
+
+.praman-icon.dissimilar {
+    color: var(--color-info, #2563eb);
+}
+
+/* Praman List */
+.praman-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.praman-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 100px;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 20px;
+    opacity: 0.7;
+}
+
+/* Praman Card */
+.praman-card {
+    background: var(--color-bg);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+    border: 1px solid var(--color-border);
+    transition: all 0.2s ease;
+}
+
+.praman-card:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.praman-card.similar {
+    border-left: 3px solid var(--color-success, #16a34a);
+}
+
+.praman-card.dissimilar {
+    border-left: 3px solid var(--color-info, #2563eb);
+}
+
+.praman-text .gurmukhi-text {
+    font-family: var(--font-gurmukhi);
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: var(--color-text);
+    margin-bottom: 6px;
+}
+
+.praman-text .roman-text {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.praman-meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.praman-meta span {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--color-hover);
+    color: var(--color-text-secondary);
+}
+
+.praman-source {
+    font-weight: 600;
+}
+
+.praman-keywords {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.praman-keywords .keyword {
+    font-family: var(--font-gurmukhi);
+    font-size: 0.85rem;
+    padding: 2px 10px;
+    border-radius: 12px;
+    background: var(--color-primary-bg, #fef3c7);
+    color: var(--color-primary);
+}
+
+.praman-score {
+    font-size: 0.75rem;
+    margin-top: 8px;
+    color: var(--color-text-secondary);
+    text-align: right;
+    opacity: 0.7;
+}
+
+/* Preferences Panel */
+.praman-preferences {
+    padding: 12px 24px;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+}
+
+.preferences-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preferences-toggle:hover {
+    background: var(--color-hover);
+}
+
+.preferences-panel {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--color-hover);
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.preference-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.preference-item label {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.preference-item input[type="range"] {
+    flex: 1;
+    max-width: 120px;
+    accent-color: var(--color-primary);
+}
+
+.preference-value {
+    font-weight: 600;
+    color: var(--color-primary);
+    min-width: 24px;
+    text-align: center;
+}
+
+.preference-item.checkbox {
+    display: flex;
+}
+
+.preference-item.checkbox label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.preference-item.checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+}
+
+.checkbox-label {
+    color: var(--color-text);
+}
+
+/* Shabad transition animation */
+.shabad-transition {
+    animation: shabadSlide 0.5s ease;
+}
+
+@keyframes shabadSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Shabad Mode */
+@media (max-width: 1024px) {
+    .praman-panels {
+        flex-direction: column;
+    }
+    
+    .praman-panel {
+        flex: 0 0 auto;
+        max-height: 300px;
+    }
+    
+    .shabad-display-area {
+        flex: 0 0 40%;
+        max-height: 40%;
+    }
+    
+    .shabad-line-display .gurmukhi-text {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .shabad-container {
+        height: auto;
+        min-height: calc(100vh - 60px);
+    }
+    
+    .shabad-split-view {
+        flex-direction: column;
+    }
+    
+    .shabad-display-area {
+        flex: 0 0 auto;
+        min-height: 250px;
+        max-height: none;
+    }
+    
+    .shabad-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .shabad-controls button {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    #shabadStatus {
+        margin-left: 0;
+        justify-content: center;
+    }
+    
+    .shabad-line-display .gurmukhi-text {
+        font-size: 1.5rem;
+    }
+    
+    .shabad-line-display .roman-text {
+        font-size: 0.9rem;
+    }
+    
+    .shabad-metadata {
+        gap: 12px;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .praman-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .praman-filter-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .praman-panels {
+        flex-direction: column;
+        padding: 12px;
+    }
+    
+    .praman-panel {
+        max-height: none;
+    }
+    
+    .preferences-panel {
+        grid-template-columns: 1fr;
+    }
+}

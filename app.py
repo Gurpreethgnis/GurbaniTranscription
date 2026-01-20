@@ -118,6 +118,12 @@ def live():
     return render_template('live.html')
 
 
+@app.route('/shabad')
+def shabad():
+    """Serve the shabad mode page (Phase 15)."""
+    return render_template('shabad.html')
+
+
 @app.route('/static/<path:filename>')
 def static_files(filename):
     """Serve static files."""
@@ -133,6 +139,207 @@ def status():
         "orchestrator_loaded": orch is not None,
         "model_size": config.WHISPER_MODEL_SIZE
     })
+
+
+# ============================================
+# SHABAD MODE API ENDPOINTS (Phase 15)
+# ============================================
+
+@app.route('/api/praman/similar', methods=['POST'])
+def get_similar_pramans():
+    """
+    Get semantically similar pramans for a given Gurmukhi text.
+    
+    Request JSON:
+    {
+        "text": "ਹਰਿ ਕਾ ਨਾਮੁ ਧਿਆਇ ਕੈ ਹੋਹੁ ਹਰਿਆ ਭਾਈ",
+        "count": 5,
+        "exclude_line_ids": ["123", "456"]  // Optional
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({"error": "Missing 'text' field"}), 400
+        
+        text = data.get('text', '')
+        count = data.get('count', config.PRAMAN_DEFAULT_SIMILAR_COUNT)
+        exclude_ids = set(data.get('exclude_line_ids', []))
+        
+        # Get semantic praman service
+        from services.semantic_praman import get_semantic_praman_service
+        service = get_semantic_praman_service()
+        
+        # Ensure index is built
+        if service.index is None:
+            from scripture.sggs_db import SGGSDatabase
+            sggs_db = SGGSDatabase()
+            service.build_index(sggs_db=sggs_db)
+        
+        # Find similar pramans
+        results = service.find_similar_pramans(text, top_k=count, exclude_line_ids=exclude_ids)
+        
+        return jsonify({
+            "query_text": text,
+            "pramans": [
+                {
+                    "line_id": p.line_id,
+                    "gurmukhi": p.gurmukhi,
+                    "roman": p.roman,
+                    "source": p.source,
+                    "ang": p.ang,
+                    "raag": p.raag,
+                    "author": p.author,
+                    "similarity_score": p.similarity_score,
+                    "shared_keywords": p.shared_keywords
+                }
+                for p in results
+            ]
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error getting similar pramans: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/praman/dissimilar', methods=['POST'])
+def get_dissimilar_pramans():
+    """
+    Get thematically contrasting pramans for a given Gurmukhi text.
+    
+    Request JSON:
+    {
+        "text": "ਹਰਿ ਕਾ ਨਾਮੁ ਧਿਆਇ ਕੈ ਹੋਹੁ ਹਰਿਆ ਭਾਈ",
+        "count": 3,
+        "exclude_line_ids": ["123", "456"]  // Optional
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({"error": "Missing 'text' field"}), 400
+        
+        text = data.get('text', '')
+        count = data.get('count', config.PRAMAN_DEFAULT_DISSIMILAR_COUNT)
+        exclude_ids = set(data.get('exclude_line_ids', []))
+        
+        # Get semantic praman service
+        from services.semantic_praman import get_semantic_praman_service
+        service = get_semantic_praman_service()
+        
+        # Ensure index is built
+        if service.index is None:
+            from scripture.sggs_db import SGGSDatabase
+            sggs_db = SGGSDatabase()
+            service.build_index(sggs_db=sggs_db)
+        
+        # Find dissimilar pramans
+        results = service.find_dissimilar_pramans(text, top_k=count, exclude_line_ids=exclude_ids)
+        
+        return jsonify({
+            "query_text": text,
+            "pramans": [
+                {
+                    "line_id": p.line_id,
+                    "gurmukhi": p.gurmukhi,
+                    "roman": p.roman,
+                    "source": p.source,
+                    "ang": p.ang,
+                    "raag": p.raag,
+                    "author": p.author,
+                    "similarity_score": p.similarity_score,
+                    "shared_keywords": p.shared_keywords
+                }
+                for p in results
+            ]
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error getting dissimilar pramans: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/praman/search', methods=['POST'])
+def search_pramans():
+    """
+    Search for both similar and dissimilar pramans.
+    
+    Request JSON:
+    {
+        "text": "ਹਰਿ ਕਾ ਨਾਮੁ ਧਿਆਇ ਕੈ ਹੋਹੁ ਹਰਿਆ ਭਾਈ",
+        "similar_count": 5,
+        "dissimilar_count": 3,
+        "current_shabad_id": "optional_shabad_id"
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({"error": "Missing 'text' field"}), 400
+        
+        text = data.get('text', '')
+        similar_count = data.get('similar_count', config.PRAMAN_DEFAULT_SIMILAR_COUNT)
+        dissimilar_count = data.get('dissimilar_count', config.PRAMAN_DEFAULT_DISSIMILAR_COUNT)
+        current_shabad_id = data.get('current_shabad_id')
+        
+        # Get semantic praman service
+        from services.semantic_praman import get_semantic_praman_service
+        service = get_semantic_praman_service()
+        
+        # Ensure index is built
+        if service.index is None:
+            from scripture.sggs_db import SGGSDatabase
+            sggs_db = SGGSDatabase()
+            service.build_index(sggs_db=sggs_db)
+        
+        # Search pramans
+        result = service.search_pramans(
+            text,
+            similar_count=similar_count,
+            dissimilar_count=dissimilar_count,
+            exclude_same_shabad=bool(current_shabad_id),
+            current_shabad_id=current_shabad_id
+        )
+        
+        return jsonify({
+            "query_text": result.query_text,
+            "query_keywords": result.query_keywords,
+            "similar_pramans": [
+                {
+                    "line_id": p.line_id,
+                    "gurmukhi": p.gurmukhi,
+                    "roman": p.roman,
+                    "source": p.source,
+                    "ang": p.ang,
+                    "raag": p.raag,
+                    "author": p.author,
+                    "similarity_score": p.similarity_score,
+                    "shared_keywords": p.shared_keywords
+                }
+                for p in result.similar_pramans
+            ],
+            "dissimilar_pramans": [
+                {
+                    "line_id": p.line_id,
+                    "gurmukhi": p.gurmukhi,
+                    "roman": p.roman,
+                    "source": p.source,
+                    "ang": p.ang,
+                    "raag": p.raag,
+                    "author": p.author,
+                    "similarity_score": p.similarity_score,
+                    "shared_keywords": p.shared_keywords
+                }
+                for p in result.dissimilar_pramans
+            ]
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error searching pramans: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/upload', methods=['POST'])
@@ -1050,7 +1257,7 @@ if __name__ == '__main__':
     
     # Phase 6: Initialize WebSocket server and live orchestrator
     print("\nInitializing WebSocket server for live mode...")
-    websocket_server = WebSocketServer(app, orchestrator_callback=None)
+    websocket_server = WebSocketServer(app, orchestrator_callback=None, shabad_callback=None)
     
     # Initialize live orchestrator with WebSocket callback
     def handle_audio_chunk(audio_bytes: bytes, session_id: str, chunk_data: dict):
@@ -1093,8 +1300,59 @@ if __name__ == '__main__':
         thread.daemon = True
         thread.start()
     
-    # Update WebSocket server callback
+    # Phase 15: Shabad mode audio chunk handler
+    def handle_shabad_audio_chunk(audio_bytes: bytes, session_id: str, chunk_data: dict):
+        """Handle audio chunk for shabad mode with praman suggestions."""
+        live_orch = init_live_orchestrator(websocket_server)
+        if not live_orch:
+            websocket_server.emit_error(session_id, "Shabad orchestrator not available")
+            return None
+        
+        # Track session
+        if session_id not in live_sessions:
+            live_sessions[session_id] = {
+                'start_time': time.time(),
+                'chunks_processed': 0,
+                'mode': 'shabad'
+            }
+        
+        # Process audio chunk
+        start_time = chunk_data.get('start_time', 0.0)
+        end_time = chunk_data.get('end_time', start_time + 2.0)  # 2 second chunks for shabad
+        similar_count = chunk_data.get('similar_count', config.PRAMAN_DEFAULT_SIMILAR_COUNT)
+        dissimilar_count = chunk_data.get('dissimilar_count', config.PRAMAN_DEFAULT_DISSIMILAR_COUNT)
+        
+        # Process in background thread to avoid blocking
+        def process_shabad_chunk():
+            try:
+                result = live_orch.process_shabad_audio_chunk(
+                    audio_bytes=audio_bytes,
+                    start_time=start_time,
+                    end_time=end_time,
+                    session_id=session_id,
+                    similar_count=similar_count,
+                    dissimilar_count=dissimilar_count
+                )
+                live_sessions[session_id]['chunks_processed'] += 1
+                
+                # Emit shabad update via WebSocket
+                if result:
+                    websocket_server.emit_shabad_full_update(session_id, result)
+                    
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Error processing shabad chunk: {e}", exc_info=True)
+                websocket_server.emit_error(session_id, f"Shabad processing error: {str(e)}")
+        
+        thread = threading.Thread(target=process_shabad_chunk)
+        thread.daemon = True
+        thread.start()
+        
+        return None  # Results sent via WebSocket
+    
+    # Update WebSocket server callbacks
     websocket_server.orchestrator_callback = handle_audio_chunk
+    websocket_server.shabad_callback = handle_shabad_audio_chunk
     
     print(f"Starting server with WebSocket support on http://{config.HOST}:{config.PORT}")
     websocket_server.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

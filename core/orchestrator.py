@@ -5,6 +5,7 @@ Coordinates VAD chunking, language identification, and ASR processing
 to produce structured transcription results.
 
 Phase 2: Supports multi-ASR ensemble with fusion.
+Phase 12: Supports dynamic provider selection via ProviderRegistry.
 """
 import logging
 import uuid
@@ -23,11 +24,22 @@ from asr.asr_whisper import ASRWhisper
 from asr.asr_indic import ASRIndic
 from asr.asr_english_fallback import ASREnglish
 from asr.asr_fusion import ASRFusion
+from asr.provider_registry import ProviderRegistry, ProviderType, get_registry
 from services.script_converter import ScriptConverter
+from services.script_lock import ScriptLock, enforce_gurmukhi
+from services.drift_detector import DriftDetector, DriftSeverity, detect_drift
+from services.domain_corrector import DomainCorrector, correct_transcription
+from data.language_domains import DomainMode, get_output_policy
 from quotes.quote_candidates import QuoteCandidateDetector
 from quotes.assisted_matcher import AssistedMatcher
 from quotes.canonical_replacer import CanonicalReplacer
+from quotes.quote_context_detector import QuoteContextDetector, QuoteContextResult
+from quotes.constrained_matcher import ConstrainedQuoteMatcher
 from post.transcript_merger import TranscriptMerger
+# SGGS Enhancement imports
+from asr.gurbani_prompt import GurbaniPromptBuilder, get_gurbani_prompt
+from services.ngram_rescorer import NGramRescorer, get_ngram_rescorer
+from services.sggs_aligner import SGGSAligner, get_sggs_aligner
 from post.annotator import Annotator
 from post.document_formatter import DocumentFormatter
 from core.errors import ASREngineError, VADError, FusionError, AudioDenoiseError
@@ -54,7 +66,9 @@ class Orchestrator:
         asr_indic: Optional[ASRIndic] = None,
         asr_english: Optional[ASREnglish] = None,
         fusion_service: Optional[ASRFusion] = None,
-        live_callback: Optional[Callable] = None
+        live_callback: Optional[Callable] = None,
+        primary_provider: Optional[str] = None,
+        fallback_provider: Optional[str] = None
     ):
         """
         Initialize orchestrator with services.
@@ -69,6 +83,8 @@ class Orchestrator:
             live_callback: Callback for live mode events
                           Signature: (event_type: str, data: Dict[str, Any]) -> None
                           event_type: "draft" or "verified"
+            primary_provider: Primary ASR provider type (whisper, indicconformer, wav2vec2, commercial)
+            fallback_provider: Fallback ASR provider type
         """
         self.vad_service = vad_service or VADService(
             aggressiveness=config.VAD_AGGRESSIVENESS if hasattr(config, 'VAD_AGGRESSIVENESS') else 2,
@@ -77,12 +93,26 @@ class Orchestrator:
             overlap_seconds=config.VAD_OVERLAP_SECONDS if hasattr(config, 'VAD_OVERLAP_SECONDS') else 0.5
         )
         
-        # Initialize ASR-A service first (needed for LangID)
-        self.asr_service = asr_service or ASRWhisper()
+        # Phase 12: Initialize provider registry for dynamic provider selection
+        self.provider_registry = get_registry()
+        self.primary_provider_type = primary_provider or getattr(config, 'ASR_PRIMARY_PROVIDER', 'whisper')
+        self.fallback_provider_type = fallback_provider or getattr(config, 'ASR_FALLBACK_PROVIDER', None)
+        
+        # Initialize primary ASR service using registry or provided service
+        if asr_service is not None:
+            self.asr_service = asr_service
+        else:
+            self.asr_service = self._get_primary_asr_service()
         
         # Initialize ASR-B (Indic) and ASR-C (English) for Phase 2
+        # These are still used for multi-ASR fusion when primary is whisper
         self.asr_indic = asr_indic
         self.asr_english = asr_english
+        
+        # Store additional providers for new provider types
+        self._indicconformer_provider = None
+        self._wav2vec2_provider = None
+        self._commercial_provider = None
         
         # Initialize fusion service
         self.fusion_service = fusion_service or ASRFusion()
@@ -108,6 +138,49 @@ class Orchestrator:
         # Phase 11: Initialize document formatting
         self.document_formatter = DocumentFormatter()
         logger.info("Document formatting service initialized for Phase 11")
+        
+        # Phase 14: Initialize SGGS enhancement services
+        self._enable_gurbani_prompting = getattr(config, 'ENABLE_GURBANI_PROMPTING', True)
+        self._enable_ngram_rescoring = getattr(config, 'ENABLE_NGRAM_RESCORING', True)
+        self._enable_quote_alignment = getattr(config, 'ENABLE_QUOTE_ALIGNMENT', True)
+        
+        if self._enable_gurbani_prompting:
+            self.prompt_builder = GurbaniPromptBuilder()
+            logger.info("Gurbani prompt builder initialized for SGGS enhancement")
+        else:
+            self.prompt_builder = None
+        
+        if self._enable_ngram_rescoring:
+            try:
+                self.ngram_rescorer = get_ngram_rescorer()
+                logger.info("N-gram rescorer initialized for SGGS enhancement")
+            except Exception as e:
+                logger.warning(f"Failed to initialize N-gram rescorer: {e}")
+                self.ngram_rescorer = None
+        else:
+            self.ngram_rescorer = None
+        
+        self.quote_context_detector = QuoteContextDetector()
+        self.constrained_matcher = ConstrainedQuoteMatcher()
+        
+        if self._enable_quote_alignment:
+            try:
+                self.sggs_aligner = get_sggs_aligner()
+                logger.info("SGGS aligner initialized for quote snapping")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SGGS aligner: {e}")
+                self.sggs_aligner = None
+        else:
+            self.sggs_aligner = None
+        
+        # Phase 13: Initialize domain language prioritization services
+        self._domain_mode = DomainMode(getattr(config, 'DOMAIN_MODE', 'sggs'))
+        self._strict_gurmukhi = getattr(config, 'STRICT_GURMUKHI', True)
+        self._enable_domain_correction = getattr(config, 'ENABLE_DOMAIN_CORRECTION', True)
+        self.script_lock = ScriptLock(self._domain_mode)
+        self.drift_detector = DriftDetector(self._domain_mode)
+        self.domain_corrector = DomainCorrector(self._domain_mode)
+        logger.info(f"Domain language prioritization initialized (mode: {self._domain_mode.value})")
         
         # Create LangID service with ASR-A for quick detection
         if langid_service is None:
@@ -143,6 +216,122 @@ class Orchestrator:
         
         # Store current processing options
         self.current_processing_options = None
+        
+        logger.info(f"Orchestrator initialized with primary provider: {self.primary_provider_type}")
+    
+    def _get_primary_asr_service(self):
+        """
+        Get the primary ASR service based on configured provider type.
+        
+        Returns:
+            ASR provider instance
+        """
+        try:
+            # For whisper, use the existing ASRWhisper
+            if self.primary_provider_type == "whisper":
+                return ASRWhisper()
+            
+            # For other providers, use the registry
+            return self.provider_registry.get_provider(self.primary_provider_type)
+        except Exception as e:
+            logger.warning(f"Failed to load primary provider {self.primary_provider_type}: {e}")
+            logger.info("Falling back to Whisper")
+            return ASRWhisper()
+    
+    def get_provider(self, provider_type: str):
+        """
+        Get an ASR provider by type.
+        
+        Args:
+            provider_type: Provider type (whisper, indicconformer, wav2vec2, commercial)
+        
+        Returns:
+            ASR provider instance
+        """
+        if provider_type == "whisper":
+            return self.asr_service
+        
+        # Use cached providers for efficiency
+        if provider_type == "indicconformer":
+            if self._indicconformer_provider is None:
+                self._indicconformer_provider = self.provider_registry.get_provider("indicconformer")
+            return self._indicconformer_provider
+        
+        if provider_type == "wav2vec2":
+            if self._wav2vec2_provider is None:
+                self._wav2vec2_provider = self.provider_registry.get_provider("wav2vec2")
+            return self._wav2vec2_provider
+        
+        if provider_type == "commercial":
+            if self._commercial_provider is None:
+                self._commercial_provider = self.provider_registry.get_provider("commercial")
+            return self._commercial_provider
+        
+        # Fallback to registry
+        return self.provider_registry.get_provider(provider_type)
+    
+    def set_primary_provider(self, provider_type: str):
+        """
+        Change the primary ASR provider at runtime.
+        
+        Args:
+            provider_type: New primary provider type
+        """
+        self.primary_provider_type = provider_type
+        self.asr_service = self._get_primary_asr_service()
+        logger.info(f"Primary provider changed to: {provider_type}")
+    
+    def get_available_providers(self) -> List[str]:
+        """
+        Get list of available ASR providers.
+        
+        Returns:
+            List of provider type names
+        """
+        return self.provider_registry.list_available_providers()
+    
+    def get_provider_capabilities(self, provider_type: str = None) -> Dict[str, Any]:
+        """
+        Get capabilities for one or all providers.
+        
+        Args:
+            provider_type: Specific provider, or None for all
+        
+        Returns:
+            Dictionary of capabilities
+        """
+        return self.provider_registry.get_capabilities(provider_type)
+    
+    def set_domain_mode(self, mode: str, strict_gurmukhi: bool = True) -> None:
+        """
+        Set domain mode for language prioritization.
+        
+        Args:
+            mode: Domain mode (sggs, dasam, generic)
+            strict_gurmukhi: Whether to enforce strict Gurmukhi output
+        """
+        self._domain_mode = DomainMode(mode)
+        self._strict_gurmukhi = strict_gurmukhi
+        
+        # Re-initialize domain services with new mode
+        self.script_lock = ScriptLock(self._domain_mode)
+        self.drift_detector = DriftDetector(self._domain_mode)
+        self.domain_corrector = DomainCorrector(self._domain_mode)
+        
+        logger.info(f"Domain mode changed to: {mode}, strict_gurmukhi: {strict_gurmukhi}")
+    
+    def get_domain_mode(self) -> Dict[str, Any]:
+        """
+        Get current domain mode settings.
+        
+        Returns:
+            Dictionary with domain_mode, strict_gurmukhi, enable_domain_correction
+        """
+        return {
+            'domain_mode': self._domain_mode.value,
+            'strict_gurmukhi': self._strict_gurmukhi,
+            'enable_domain_correction': self._enable_domain_correction,
+        }
     
     def _apply_processing_options(self, options: Dict[str, Any], job_id: Optional[str] = None) -> None:
         """
@@ -200,7 +389,9 @@ class Orchestrator:
         mode: str = "batch",
         job_id: Optional[str] = None,
         processing_options: Optional[Dict[str, Any]] = None,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[callable] = None,
+        domain_mode: Optional[str] = None,
+        strict_gurmukhi: Optional[bool] = None
     ) -> TranscriptionResult:
         """
         Transcribe an audio file using the orchestrated pipeline.
@@ -222,6 +413,8 @@ class Orchestrator:
                 - parallelWorkers: int
             progress_callback: Optional callback function with signature:
                 callback(step: str, step_progress: int, overall_progress: int, message: str, details: Optional[dict])
+            domain_mode: Domain mode for language prioritization (sggs, dasam, generic)
+            strict_gurmukhi: Enforce strict Gurmukhi-only output
         
         Returns:
             TranscriptionResult with structured segments and metadata
@@ -239,6 +432,21 @@ class Orchestrator:
         # Apply processing options
         if processing_options:
             self._apply_processing_options(processing_options, job_id)
+        
+        # Phase 13: Configure domain mode for this transcription
+        current_domain_mode = (
+            DomainMode(domain_mode) if domain_mode 
+            else self._domain_mode
+        )
+        current_strict_gurmukhi = (
+            strict_gurmukhi if strict_gurmukhi is not None 
+            else self._strict_gurmukhi
+        )
+        logger.info(f"[{job_id}] Domain mode: {current_domain_mode.value}, strict Gurmukhi: {current_strict_gurmukhi}")
+        
+        # Store for use in _process_chunk_with_fusion
+        self._current_domain_mode = current_domain_mode
+        self._current_strict_gurmukhi = current_strict_gurmukhi
         
         # Step 0: Audio denoising (Phase 7) - if enabled
         working_audio_path = audio_path
@@ -640,13 +848,28 @@ class Orchestrator:
         Returns:
             ProcessedSegment with fused results
         """
+        # Step 0: Generate Gurbani prompt if enabled
+        gurbani_prompt = None
+        if self.prompt_builder and self._enable_gurbani_prompting:
+            try:
+                # Get domain mode for prompt
+                domain_mode = getattr(self, '_current_domain_mode', self._domain_mode)
+                gurbani_prompt = self.prompt_builder.get_prompt(
+                    mode=domain_mode.value,
+                    context="scripture" if route == ROUTE_SCRIPTURE_QUOTE_LIKELY else None
+                )
+                logger.debug(f"[{job_id}] Gurbani prompt generated ({len(gurbani_prompt)} chars)")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Failed to generate Gurbani prompt: {e}")
+        
         # Step 1: Run ASR-A immediately (primary engine)
         logger.debug(f"[{job_id}] Running ASR-A (Whisper) for chunk at {chunk.start_time:.2f}s")
         try:
             asr_a_result = self.asr_service.transcribe_chunk(
                 chunk,
                 language=language,
-                route=route
+                route=route,
+                initial_prompt=gurbani_prompt  # Use Gurbani prompt
             )
             logger.debug(f"[{job_id}] ASR-A completed: confidence={asr_a_result.confidence:.2f}")
             
@@ -754,6 +977,46 @@ class Orchestrator:
                 )
                 logger.info(f"[{job_id}] Re-decode completed, new confidence: {fusion_result.fused_confidence:.2f}")
         
+        # Step 6b: Apply N-gram LM rescoring (SGGS enhancement)
+        if self.ngram_rescorer and self._enable_ngram_rescoring and fusion_result.fused_text:
+            try:
+                rescored = self.ngram_rescorer.rescore_hypothesis(
+                    fusion_result.fused_text,
+                    fusion_result.fused_confidence
+                )
+                
+                # Update confidence if LM rescoring boosted it
+                if rescored.combined_score > fusion_result.fused_confidence:
+                    logger.debug(
+                        f"[{job_id}] N-gram LM boosted confidence: "
+                        f"{fusion_result.fused_confidence:.3f} → {rescored.combined_score:.3f} "
+                        f"(perplexity: {rescored.perplexity:.1f})"
+                    )
+                    fusion_result.fused_confidence = rescored.combined_score
+            except Exception as e:
+                logger.warning(f"[{job_id}] N-gram rescoring failed: {e}")
+        
+        # Step 6c: Quote context detection (SGGS enhancement)
+        quote_context = None
+        if self.quote_context_detector:
+            try:
+                quote_context = self.quote_context_detector.detect(
+                    fusion_result.fused_text,
+                    previous_text=None  # Could pass previous segment text here
+                )
+                if quote_context.is_quote_likely:
+                    logger.debug(
+                        f"[{job_id}] Quote context detected: "
+                        f"type={quote_context.context_type}, "
+                        f"confidence={quote_context.quote_confidence:.2f}, "
+                        f"signals={quote_context.detected_signals}"
+                    )
+                    # If this is a quote intro, note it for next segment
+                    if quote_context.is_quote_intro:
+                        logger.debug(f"[{job_id}] Quote introduction detected")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Quote context detection failed: {e}")
+        
         # Step 7: Phase 3 - Apply script conversion
         logger.debug(f"[{job_id}] Applying script conversion to fused text...")
         try:
@@ -770,6 +1033,95 @@ class Orchestrator:
             # Fallback: use original text as Gurmukhi, no Roman
             converted = None
         
+        # Step 7b: Phase 13 - Domain validation and correction
+        domain_text = converted.gurmukhi if converted else fusion_result.fused_text
+        domain_needs_review = False
+        
+        try:
+            # Get current domain settings (set in transcribe_file)
+            domain_mode = getattr(self, '_current_domain_mode', self._domain_mode)
+            strict_gurmukhi = getattr(self, '_current_strict_gurmukhi', self._strict_gurmukhi)
+            
+            # Step 7b-1: Detect drift
+            drift_diagnostic = self.drift_detector.detect(domain_text)
+            logger.debug(
+                f"[{job_id}] Drift detection: purity={drift_diagnostic.script_purity:.2f}, "
+                f"latin={drift_diagnostic.latin_ratio:.3f}, oov={drift_diagnostic.oov_ratio:.2f}, "
+                f"severity={drift_diagnostic.severity.value}"
+            )
+            
+            # Step 7b-2: Apply script lock if strict mode or drift detected
+            if strict_gurmukhi or drift_diagnostic.should_redecode:
+                domain_text, script_analysis, was_repaired = self.script_lock.enforce(
+                    domain_text,
+                    strict=strict_gurmukhi
+                )
+                if was_repaired:
+                    logger.info(f"[{job_id}] Script lock repaired non-Gurmukhi characters")
+                    # Update converted text
+                    if converted:
+                        converted.gurmukhi = domain_text
+            
+            # Step 7b-3: Apply domain correction if enabled and needed
+            if self._enable_domain_correction and drift_diagnostic.should_correct:
+                corrected_text, correction_results = self.domain_corrector.correct_text(
+                    domain_text,
+                    enforce_script=False  # Already done above
+                )
+                corrections_made = sum(1 for r in correction_results if r.was_corrected)
+                if corrections_made > 0:
+                    logger.info(f"[{job_id}] Domain corrector made {corrections_made} corrections")
+                    domain_text = corrected_text
+                    if converted:
+                        converted.gurmukhi = domain_text
+            
+            # Step 7b-4: Flag for review if drift is severe
+            if drift_diagnostic.severity in (DriftSeverity.HIGH, DriftSeverity.CRITICAL):
+                domain_needs_review = True
+                logger.warning(
+                    f"[{job_id}] Segment flagged for review due to drift: {drift_diagnostic.severity.value}"
+                )
+        except Exception as e:
+            logger.error(f"[{job_id}] Domain pipeline failed: {e}", exc_info=True)
+            # Continue with original text - don't fail the whole segment
+        
+        # Step 7c: SGGS Alignment (Phase 14) - "snap" to canonical text if high confidence match
+        sggs_alignment_result = None
+        if self.sggs_aligner and self._enable_quote_alignment:
+            # Only attempt alignment if quote context suggests a quote or route is scripture
+            should_align = (
+                route == ROUTE_SCRIPTURE_QUOTE_LIKELY or
+                (quote_context and quote_context.is_quote_likely and quote_context.quote_confidence >= 0.5)
+            )
+            
+            if should_align:
+                try:
+                    # Extract Ang hint from quote context if available
+                    ang_hint = None
+                    if quote_context:
+                        ang_hint = self.quote_context_detector.extract_ang_reference(fusion_result.fused_text)
+                    
+                    sggs_alignment_result = self.sggs_aligner.align_to_canonical(
+                        domain_text,
+                        ang_hint=ang_hint
+                    )
+                    
+                    if sggs_alignment_result.was_aligned:
+                        logger.info(
+                            f"[{job_id}] SGGS alignment applied: score={sggs_alignment_result.alignment_score:.2f}, "
+                            f"ang={sggs_alignment_result.ang}"
+                        )
+                        domain_text = sggs_alignment_result.aligned_text
+                        if converted:
+                            converted.gurmukhi = domain_text
+                    elif sggs_alignment_result.alignment_score >= 0.5:
+                        logger.debug(
+                            f"[{job_id}] SGGS alignment found candidate (score={sggs_alignment_result.alignment_score:.2f}) "
+                            f"but below threshold"
+                        )
+                except Exception as e:
+                    logger.warning(f"[{job_id}] SGGS alignment failed: {e}")
+        
         # Step 8: Phase 4 - Quote Detection + Matching
         # Create temporary segment for quote detection
         temp_segment = ProcessedSegment(
@@ -777,49 +1129,111 @@ class Orchestrator:
             end=chunk.end_time,
             route=route,
             type="speech",  # Will be updated if quote found
-            text=converted.gurmukhi if converted else fusion_result.fused_text,
+            text=domain_text,  # Use domain-processed text
             confidence=fusion_result.fused_confidence,
             language=asr_a_result.language,
             hypotheses=fusion_result.hypotheses,
-            needs_review=False,
+            needs_review=domain_needs_review,  # Include domain review flag
             roman=converted.roman if converted else None,
             original_script=converted.original_script if converted else None,
             script_confidence=converted.confidence if converted else None
         )
         
-        # Detect quote candidates and match if route suggests scripture
-        if route == ROUTE_SCRIPTURE_QUOTE_LIKELY:
+        # Detect quote candidates and match if route suggests scripture or quote context is likely
+        should_detect_quotes = (
+            route == ROUTE_SCRIPTURE_QUOTE_LIKELY or
+            (quote_context and quote_context.is_quote_likely and quote_context.quote_confidence >= 0.4)
+        )
+        
+        if should_detect_quotes:
             logger.debug(f"[{job_id}] Detecting quote candidates...")
             try:
-                candidates = self.quote_detector.detect_candidates(
-                    temp_segment,
-                    hypotheses=fusion_result.hypotheses
-                )
-                
-                if candidates:
-                    logger.debug(f"[{job_id}] Found {len(candidates)} quote candidate(s)")
-                    
-                    # Try to find a match
-                    quote_match = self.quote_matcher.find_match(
-                        candidates,
-                        hypotheses=fusion_result.hypotheses,
-                        source=None  # Search all sources
+                # If we already have a SGGS alignment result, use it for quote matching
+                if sggs_alignment_result and sggs_alignment_result.matched_line:
+                    # Use the alignment result directly for quote replacement
+                    from core.models import QuoteMatch
+                    matched_line = sggs_alignment_result.matched_line
+                    quote_match = QuoteMatch(
+                        source=matched_line.source,
+                        line_id=matched_line.line_id,
+                        canonical_text=matched_line.gurmukhi,
+                        canonical_roman=matched_line.roman,
+                        spoken_text=temp_segment.text,
+                        confidence=sggs_alignment_result.confidence,
+                        ang=matched_line.ang,
+                        raag=matched_line.raag,
+                        author=matched_line.author,
+                        match_method="sggs_alignment"
+                    )
+                    logger.info(
+                        f"[{job_id}] Using SGGS alignment for quote match: {matched_line.line_id} "
+                        f"(confidence: {sggs_alignment_result.confidence:.2f})"
+                    )
+                    temp_segment = self.quote_replacer.replace_with_canonical(
+                        temp_segment,
+                        quote_match
+                    )
+                else:
+                    # Use traditional quote detection flow
+                    candidates = self.quote_detector.detect_candidates(
+                        temp_segment,
+                        hypotheses=fusion_result.hypotheses
                     )
                     
-                    if quote_match:
-                        logger.info(
-                            f"[{job_id}] Quote match found: {quote_match.line_id} "
-                            f"(confidence: {quote_match.confidence:.2f})"
-                        )
-                        # Replace with canonical text
-                        temp_segment = self.quote_replacer.replace_with_canonical(
-                            temp_segment,
-                            quote_match
-                        )
+                    if candidates:
+                        logger.debug(f"[{job_id}] Found {len(candidates)} quote candidate(s)")
+                        
+                        # Try to find a match using constrained matcher first (more accurate)
+                        quote_match = None
+                        if self.constrained_matcher:
+                            try:
+                                alignment = self.constrained_matcher.find_best_alignment(
+                                    temp_segment.text
+                                )
+                                if alignment and alignment.is_confident_match:
+                                    from core.models import QuoteMatch
+                                    matched_line = alignment.matched_line
+                                    quote_match = QuoteMatch(
+                                        source=matched_line.source,
+                                        line_id=matched_line.line_id,
+                                        canonical_text=matched_line.gurmukhi,
+                                        canonical_roman=matched_line.roman,
+                                        spoken_text=temp_segment.text,
+                                        confidence=alignment.confidence,
+                                        ang=matched_line.ang,
+                                        raag=matched_line.raag,
+                                        author=matched_line.author,
+                                        match_method="constrained_alignment"
+                                    )
+                                    logger.info(
+                                        f"[{job_id}] Constrained matcher found: {matched_line.line_id} "
+                                        f"(score: {alignment.alignment_score:.2f})"
+                                    )
+                            except Exception as e:
+                                logger.debug(f"[{job_id}] Constrained matcher failed: {e}")
+                        
+                        # Fall back to traditional quote matcher
+                        if not quote_match:
+                            quote_match = self.quote_matcher.find_match(
+                                candidates,
+                                hypotheses=fusion_result.hypotheses,
+                                source=None  # Search all sources
+                            )
+                        
+                        if quote_match:
+                            logger.info(
+                                f"[{job_id}] Quote match found: {quote_match.line_id} "
+                                f"(confidence: {quote_match.confidence:.2f})"
+                            )
+                            # Replace with canonical text
+                            temp_segment = self.quote_replacer.replace_with_canonical(
+                                temp_segment,
+                                quote_match
+                            )
+                        else:
+                            logger.debug(f"[{job_id}] No quote match found for candidates")
                     else:
-                        logger.debug(f"[{job_id}] No quote match found for candidates")
-                else:
-                    logger.debug(f"[{job_id}] No quote candidates detected")
+                        logger.debug(f"[{job_id}] No quote candidates detected")
             except Exception as e:
                 logger.error(f"[{job_id}] Quote detection/matching failed: {e}", exc_info=True)
                 # Continue with original text - don't fail the whole segment
@@ -909,7 +1323,7 @@ class Orchestrator:
             chunk: AudioChunk to process
             route: Route string
             language: Language code
-            engines: List of engine names to run
+            engines: List of engine names to run (asr_b, asr_c, indicconformer, wav2vec2, commercial)
         
         Returns:
             List of ASRResult from additional engines
@@ -920,18 +1334,38 @@ class Orchestrator:
             """Run a single ASR engine with timeout."""
             try:
                 logger.debug(f"[{job_id}] Starting {engine_name}...")
+                
+                # Legacy engine names
                 if engine_name == 'asr_b':
                     if self.asr_indic is None:
                         self.asr_indic = ASRIndic()
                     result = self.asr_indic.transcribe_chunk(chunk, language, route)
-                    logger.debug(f"[{job_id}] {engine_name} completed: confidence={result.confidence:.2f}")
-                    return result
                 elif engine_name == 'asr_c':
                     if self.asr_english is None:
                         self.asr_english = ASREnglish()
                     result = self.asr_english.transcribe_chunk(chunk, language, route)
-                    logger.debug(f"[{job_id}] {engine_name} completed: confidence={result.confidence:.2f}")
-                    return result
+                
+                # New provider registry engines
+                elif engine_name == 'indicconformer':
+                    provider = self.get_provider('indicconformer')
+                    result = provider.transcribe_chunk(chunk, language, route)
+                elif engine_name == 'wav2vec2':
+                    provider = self.get_provider('wav2vec2')
+                    result = provider.transcribe_chunk(chunk, language, route)
+                elif engine_name == 'commercial':
+                    provider = self.get_provider('commercial')
+                    result = provider.transcribe_chunk(chunk, language, route)
+                elif engine_name == 'whisper':
+                    # Use primary whisper service
+                    result = self.asr_service.transcribe_chunk(chunk, language, route)
+                else:
+                    # Try to get from registry
+                    provider = self.get_provider(engine_name)
+                    result = provider.transcribe_chunk(chunk, language, route)
+                
+                logger.debug(f"[{job_id}] {engine_name} completed: confidence={result.confidence:.2f}")
+                return result
+                
             except Exception as e:
                 logger.warning(f"[{job_id}] {engine_name} failed: {e}")
                 return None
@@ -979,7 +1413,7 @@ class Orchestrator:
             chunk: AudioChunk to process
             route: Route string
             language: Language code
-            engines: List of engine names to run
+            engines: List of engine names to run (asr_b, asr_c, indicconformer, wav2vec2, commercial)
         
         Returns:
             List of ASRResult from additional engines
@@ -988,6 +1422,7 @@ class Orchestrator:
         
         for engine in engines:
             try:
+                # Legacy engine names
                 if engine == 'asr_b':
                     if self.asr_indic is None:
                         self.asr_indic = ASRIndic()
@@ -998,6 +1433,29 @@ class Orchestrator:
                         self.asr_english = ASREnglish()
                     result = self.asr_english.transcribe_chunk(chunk, language, route)
                     results.append(result)
+                
+                # New provider registry engines
+                elif engine == 'indicconformer':
+                    provider = self.get_provider('indicconformer')
+                    result = provider.transcribe_chunk(chunk, language, route)
+                    results.append(result)
+                elif engine == 'wav2vec2':
+                    provider = self.get_provider('wav2vec2')
+                    result = provider.transcribe_chunk(chunk, language, route)
+                    results.append(result)
+                elif engine == 'commercial':
+                    provider = self.get_provider('commercial')
+                    result = provider.transcribe_chunk(chunk, language, route)
+                    results.append(result)
+                elif engine == 'whisper':
+                    result = self.asr_service.transcribe_chunk(chunk, language, route)
+                    results.append(result)
+                else:
+                    # Try to get from registry
+                    provider = self.get_provider(engine)
+                    result = provider.transcribe_chunk(chunk, language, route)
+                    results.append(result)
+                    
             except Exception as e:
                 logger.warning(f"[{job_id}] {engine} failed: {e}")
         

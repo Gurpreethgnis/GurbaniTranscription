@@ -2,6 +2,9 @@
  * Main JavaScript for audio transcription application.
  */
 
+// Use shared utilities
+const { escapeHtml, formatFileSize, formatTime, getStatusIcon, getStatusText, createExportDropdown, createExportHelpText } = window.KathaUtils || {};
+
 // Application state
 const appState = {
     files: [],
@@ -324,39 +327,7 @@ function createFileItem(fileData, index) {
     return item;
 }
 
-function getStatusIcon(status) {
-    const icons = {
-        'pending': '⏳',
-        'processing': '🔄',
-        'success': '✅',
-        'error': '❌'
-    };
-    return icons[status] || '⏳';
-}
-
-function getStatusText(status) {
-    const texts = {
-        'pending': 'Pending',
-        'processing': 'Processing...',
-        'success': 'Completed',
-        'error': 'Error'
-    };
-    return texts[status] || 'Pending';
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Note: getStatusIcon, getStatusText, formatFileSize, escapeHtml are now imported from utils.js
 
 async function processFile(index) {
     // If in batch mode, process all files instead
@@ -694,8 +665,8 @@ function viewTranscription(index) {
                     </svg>
                     Copy to Clipboard
                 </button>
-                <div class="export-dropdown-container" style="position: relative; display: inline-block;">
-                    <select id="formatSelect-${index}" class="format-select" style="padding: 8px 12px; border: 1px solid var(--color-primary); border-radius: 4px 0 0 4px; font-size: 14px; background: white; cursor: pointer; min-width: 180px;">
+                <div class="export-dropdown-inline">
+                    <select id="formatSelect-${index}" class="format-select">
                         <optgroup label="Simple Downloads">
                             <option value="txt">Plain Text (.txt)</option>
                             <option value="json-raw">Raw JSON (.json)</option>
@@ -708,7 +679,7 @@ function viewTranscription(index) {
                             <option value="pdf">PDF Document</option>
                         </optgroup>
                     </select>
-                    <button class="btn-primary" onclick="exportDocument(${index})" id="exportBtn-${index}" style="border-radius: 0 4px 4px 0; margin-left: -1px;">
+                    <button class="btn-primary" onclick="exportDocument(${index})" id="exportBtn-${index}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
@@ -718,9 +689,9 @@ function viewTranscription(index) {
                     </button>
                 </div>
             </div>
-            <div class="export-help" style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 0.85em; color: #666;">
+            <div class="export-help-inline">
                 <strong>Export Options:</strong>
-                <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <ul>
                     <li><strong>Plain Text / Raw JSON:</strong> Simple output files with just the transcription</li>
                     <li><strong>Formatted Documents:</strong> Rich documents with sections, scripture quotes, and metadata</li>
                 </ul>
@@ -1084,19 +1055,7 @@ function updateDetailedProgress(fileIndex, progressData) {
     }
 }
 
-function formatTime(seconds) {
-    if (seconds < 60) {
-        return `${Math.round(seconds)}s`;
-    } else if (seconds < 3600) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.round(seconds % 60);
-        return `${mins}m ${secs}s`;
-    } else {
-        const hours = Math.floor(seconds / 3600);
-        const mins = Math.floor((seconds % 3600) / 60);
-        return `${hours}h ${mins}m`;
-    }
-}
+// Note: formatTime is now imported from utils.js
 
 function updateStatus(message, type = 'info') {
     statusMessage.textContent = message;

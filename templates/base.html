@@ -53,6 +53,14 @@
                     </svg>
                     <span class="nav-label">History</span>
                 </a>
+                
+                <a href="{{ url_for('settings') }}" class="nav-item {% block nav_settings_active %}{% endblock %}" data-page="settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span class="nav-label">Settings</span>
+                </a>
             </nav>
             
             <div class="sidebar-footer">
@@ -72,13 +80,21 @@
                         <span class="theme-label-text">Theme</span>
                     </label>
                     <div class="theme-buttons">
-                        <button class="theme-btn" data-theme="harmandir" title="Harmandir Theme">
+                        <button class="theme-btn" data-theme="harmandir" title="Harmandir - Gold & Ivory">
                             <span class="theme-icon">🕌</span>
                             <span class="theme-name">Harmandir</span>
                         </button>
-                        <button class="theme-btn" data-theme="midnight" title="Midnight Theme">
+                        <button class="theme-btn" data-theme="dawn" title="Dawn - Warm Tones">
+                            <span class="theme-icon">🌅</span>
+                            <span class="theme-name">Dawn</span>
+                        </button>
+                        <button class="theme-btn" data-theme="midnight" title="Midnight - Dark Blue">
                             <span class="theme-icon">🌙</span>
                             <span class="theme-name">Midnight</span>
+                        </button>
+                        <button class="theme-btn" data-theme="amrit" title="Amrit - Teal & Amber">
+                            <span class="theme-icon">✨</span>
+                            <span class="theme-name">Amrit</span>
                         </button>
                     </div>
                 </div>
@@ -93,6 +109,7 @@
         </main>
     </div>
     
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

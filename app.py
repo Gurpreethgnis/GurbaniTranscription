@@ -1,16 +1,16 @@
 """
 Flask backend server for audio transcription application.
+
+Uses the Orchestrator pipeline for all transcription operations.
 """
-import os
 import time
 import threading
 from pathlib import Path
 from typing import Optional
-from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context, render_template
+from flask import Flask, request, jsonify, send_file, send_from_directory, render_template
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import config
-from services.whisper_service import get_whisper_service
 from utils.file_manager import FileManager
 from audio.audio_utils import get_audio_duration
 from core.orchestrator import Orchestrator
@@ -21,7 +21,6 @@ app.config['MAX_CONTENT_LENGTH'] = config.MAX_FILE_SIZE_MB * 1024 * 1024  # Conv
 
 # Initialize services
 file_manager = FileManager()
-whisper_service = None
 orchestrator = None
 live_orchestrator = None  # Phase 6: Separate orchestrator for live mode
 websocket_server = None  # Phase 6: WebSocket server
@@ -31,18 +30,6 @@ progress_store = {}
 
 # Phase 6: Live session tracking
 live_sessions = {}  # session_id -> {start_time, chunks_processed}
-
-
-def init_whisper():
-    """Initialize Whisper service (lazy loading)."""
-    global whisper_service
-    if whisper_service is None:
-        try:
-            whisper_service = get_whisper_service()
-        except Exception as e:
-            print(f"Warning: Failed to initialize Whisper: {e}")
-            whisper_service = None
-    return whisper_service
 
 
 def init_orchestrator():
@@ -140,11 +127,11 @@ def static_files(filename):
 @app.route('/status', methods=['GET'])
 def status():
     """Health check and status endpoint."""
-    service = init_whisper()
+    orch = init_orchestrator()
     return jsonify({
         "status": "ok",
-        "whisper_loaded": service is not None and service.is_model_loaded(),
-        "model_size": config.WHISPER_MODEL_SIZE if service else None
+        "orchestrator_loaded": orch is not None,
+        "model_size": config.WHISPER_MODEL_SIZE
     })
 
 
@@ -196,170 +183,19 @@ def upload_file():
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe_file():
-    """Transcribe a single audio file with progress tracking."""
-    data = request.get_json()
+    """
+    Transcribe a single audio file.
     
-    if not data or 'filename' not in data:
-        return jsonify({"error": "Filename required"}), 400
-    
-    filename = data['filename']
-    file_path = config.UPLOAD_DIR / filename
-    
-    if not file_path.exists():
-        return jsonify({"error": "File not found"}), 404
-    
-    # Initialize Whisper if needed
-    service = init_whisper()
-    if not service:
-        return jsonify({"error": "Whisper service not available"}), 500
-    
-    try:
-        # Check if already processed
-        file_hash = file_manager.get_file_hash(file_path)
-        is_processed, log_entry = file_manager.is_file_processed(filename, file_hash)
-        
-        if is_processed and log_entry and log_entry.get("status") == "success":
-            # Return existing transcription - but verify files actually exist
-            text_path, json_path = file_manager.get_output_paths(filename)
-            
-            # If files don't exist, reprocess the file
-            if not text_path or not json_path:
-                # Files missing, remove from log and reprocess
-                log_data = file_manager.load_log()
-                log_data = [e for e in log_data if e.get("filename") != filename]
-                file_manager.save_log(log_data)
-                # Continue to process below
-            else:
-                # Files exist, return them
-                # Read transcription text from file
-                transcription_text = ""
-                if text_path.exists():
-                    with open(text_path, "r", encoding="utf-8") as f:
-                        transcription_text = f.read()
-                
-                return jsonify({
-                    "status": "success",
-                    "message": "File already processed",
-                    "transcription": transcription_text,
-                    "language": log_entry.get("language_detected"),
-                    "text_file": str(text_path),
-                    "json_file": str(json_path),
-                    "log_entry": log_entry
-                })
-        
-        # Get audio duration for progress estimation
-        audio_duration = get_audio_duration(file_path)
-        start_time = time.time()
-        
-        # Progress callback
-        progress_data = {
-            "filename": filename,
-            "progress": 0,
-            "status": "processing",
-            "message": "Starting transcription...",
-            "elapsed_time": 0,
-            "estimated_remaining": None,
-            "audio_duration": audio_duration
-        }
-        progress_store[filename] = progress_data
-        
-        def progress_callback(update):
-            """Update progress store with latest information."""
-            elapsed = time.time() - start_time
-            progress_data["elapsed_time"] = elapsed
-            progress_data["progress"] = update.get("progress", 0)
-            progress_data["message"] = update.get("message", "Transcribing...")
-            
-            # Estimate remaining time
-            if progress_data["progress"] > 0 and progress_data["progress"] < 100:
-                estimated_total = elapsed / (progress_data["progress"] / 100)
-                progress_data["estimated_remaining"] = max(0, estimated_total - elapsed)
-            elif audio_duration:
-                # Rough estimate: Whisper typically processes at 0.5-2x realtime
-                # Use conservative 1x realtime estimate
-                progress_data["estimated_remaining"] = max(0, audio_duration - elapsed)
-        
-        # Transcribe with progress callback
-        result = whisper_service.transcribe_with_language_detection(
-            file_path,
-            language_hints=config.LANGUAGE_HINTS,
-            progress_callback=progress_callback
-        )
-        
-        transcription_text = result.get("text", "")
-        language = result.get("language", "unknown")
-        total_time = time.time() - start_time
-        
-        # Save transcription
-        metadata = {
-            "language": language,
-            "language_probability": result.get("language_probability"),
-            "segments": result.get("segments", []),
-            "processing_time": total_time
-        }
-        text_path, json_path = file_manager.save_transcription(
-            filename,
-            transcription_text,
-            metadata
-        )
-        
-        # Update log
-        log_entry = file_manager.add_log_entry(
-            filename=filename,
-            status="success",
-            transcription=transcription_text,
-            language=language,
-            file_hash=file_hash,
-            model_used=config.WHISPER_MODEL_SIZE
-        )
-        
-        # Update progress to complete
-        progress_data["progress"] = 100
-        progress_data["status"] = "completed"
-        progress_data["message"] = "Transcription complete"
-        progress_data["estimated_remaining"] = 0
-        
-        return jsonify({
-            "status": "success",
-            "transcription": transcription_text,
-            "language": language,
-            "text_file": str(text_path),
-            "json_file": str(json_path),
-            "log_entry": log_entry,
-            "processing_time": total_time
-        })
-        
-    except Exception as e:
-        # Log error
-        file_hash = file_manager.get_file_hash(file_path)
-        file_manager.add_log_entry(
-            filename=filename,
-            status="error",
-            error=str(e),
-            file_hash=file_hash
-        )
-        
-        # Update progress with error
-        if filename in progress_store:
-            progress_store[filename]["status"] = "error"
-            progress_store[filename]["message"] = f"Error: {str(e)}"
-        
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-    finally:
-        # Clean up progress after a delay (keep for 30 seconds)
-        def cleanup():
-            time.sleep(30)
-            if filename in progress_store:
-                del progress_store[filename]
-        threading.Thread(target=cleanup, daemon=True).start()
+    DEPRECATED: This route now redirects to /transcribe-v2 which uses the
+    full orchestrator pipeline. Kept for backwards compatibility.
+    """
+    # Simply delegate to the v2 endpoint
+    return transcribe_file_v2()
 
 
 @app.route('/transcribe-v2', methods=['POST'])
 def transcribe_file_v2():
-    """Transcribe a single audio file using the orchestrator pipeline (Phase 1)."""
+    """Transcribe a single audio file using the orchestrator pipeline."""
     data = request.get_json()
     
     if not data or 'filename' not in data:
@@ -429,6 +265,10 @@ def transcribe_file_v2():
         # Parse processing options from request
         processing_options = data.get('processing_options', {})
         
+        # Parse domain mode options
+        domain_mode = data.get('domain_mode', 'sggs')
+        strict_gurmukhi = data.get('strict_gurmukhi', True)
+        
         # Create progress callback
         def progress_callback(step: str, step_progress: int, overall_progress: int, message: str, details: Optional[dict]):
             """Update progress store with step information."""
@@ -449,10 +289,18 @@ def transcribe_file_v2():
         
         # Transcribe using orchestrator
         print(f"Starting transcription of {filename} using orchestrator...")
+        print(f"Domain mode: {domain_mode}, strict Gurmukhi: {strict_gurmukhi}")
         if processing_options:
             print(f"Processing options: {processing_options}")
         try:
-            result = orch.transcribe_file(file_path, mode="batch", processing_options=processing_options, progress_callback=progress_callback)
+            result = orch.transcribe_file(
+                file_path, 
+                mode="batch", 
+                processing_options=processing_options, 
+                progress_callback=progress_callback,
+                domain_mode=domain_mode,
+                strict_gurmukhi=strict_gurmukhi
+            )
             print(f"Transcription completed for {filename}")
         except Exception as transcribe_error:
             error_msg = f"Transcription failed: {str(transcribe_error)}"
@@ -543,7 +391,7 @@ def transcribe_file_v2():
 
 @app.route('/transcribe-batch', methods=['POST'])
 def transcribe_batch():
-    """Transcribe multiple files in batch."""
+    """Transcribe multiple files in batch using the orchestrator pipeline."""
     data = request.get_json()
     
     if not data or 'filenames' not in data:
@@ -553,12 +401,13 @@ def transcribe_batch():
     if not isinstance(filenames, list):
         return jsonify({"error": "Filenames must be a list"}), 400
     
-    # Initialize Whisper if needed
-    service = init_whisper()
-    if not service:
-        return jsonify({"error": "Whisper service not available"}), 500
+    # Initialize orchestrator if needed
+    orch = init_orchestrator()
+    if not orch:
+        return jsonify({"error": "Orchestrator service not available"}), 500
     
     results = []
+    processing_options = data.get('processing_options', {})
     
     for filename in filenames:
         file_path = config.UPLOAD_DIR / filename
@@ -585,24 +434,27 @@ def transcribe_batch():
                 })
                 continue
             
-            # Transcribe
-            result = whisper_service.transcribe_with_language_detection(
-                file_path,
-                language_hints=config.LANGUAGE_HINTS
-            )
+            # Transcribe using orchestrator
+            result = orch.transcribe_file(file_path, mode="batch", processing_options=processing_options)
             
-            transcription_text = result.get("text", "")
-            language = result.get("language", "unknown")
+            # Extract transcription
+            full_text = result.transcription.get("gurmukhi", "")
+            if not full_text:
+                full_text = " ".join(seg.text for seg in result.segments)
+            
+            language = result.segments[0].language if result.segments else "unknown"
             
             # Save transcription
             metadata = {
                 "language": language,
-                "language_probability": result.get("language_probability"),
-                "segments": result.get("segments", [])
+                "segments": [seg.to_dict() for seg in result.segments],
+                "transcription": result.transcription,
+                "metrics": result.metrics,
+                "mode": "orchestrated_batch"
             }
             text_path, json_path = file_manager.save_transcription(
                 filename,
-                transcription_text,
+                full_text,
                 metadata
             )
             
@@ -610,16 +462,16 @@ def transcribe_batch():
             log_entry = file_manager.add_log_entry(
                 filename=filename,
                 status="success",
-                transcription=transcription_text,
+                transcription=full_text,
                 language=language,
                 file_hash=file_hash,
-                model_used=config.WHISPER_MODEL_SIZE
+                model_used=f"{config.WHISPER_MODEL_SIZE} (orchestrated)"
             )
             
             results.append({
                 "filename": filename,
                 "status": "success",
-                "transcription": transcription_text,
+                "transcription": full_text,
                 "language": language,
                 "text_file": str(text_path),
                 "json_file": str(json_path)
@@ -673,6 +525,210 @@ def get_log():
 def history():
     """History page showing all processed transcriptions."""
     return render_template('history.html')
+
+
+@app.route('/settings')
+def settings():
+    """Settings page for ASR provider configuration."""
+    return render_template('settings.html')
+
+
+@app.route('/api/providers', methods=['GET'])
+def get_providers():
+    """Get available ASR providers and their capabilities."""
+    from asr.provider_registry import get_registry
+    
+    registry = get_registry()
+    capabilities = registry.get_capabilities()
+    
+    return jsonify(capabilities)
+
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """Get current settings."""
+    import json as json_lib
+    
+    settings_file = config.SETTINGS_FILE
+    
+    # Default settings
+    default_settings = {
+        "primaryProvider": getattr(config, 'ASR_PRIMARY_PROVIDER', 'whisper'),
+        "fallbackProvider": getattr(config, 'ASR_FALLBACK_PROVIDER', ''),
+        "whisper": {
+            "model": getattr(config, 'WHISPER_MODEL_SIZE', 'large')
+        },
+        "indicconformer": {
+            "model": getattr(config, 'INDICCONFORMER_MODEL', 'ai4bharat/indicconformer_stt_hi_hybrid_rnnt_large'),
+            "language": getattr(config, 'INDICCONFORMER_LANGUAGE', 'pa')
+        },
+        "wav2vec2": {
+            "model": getattr(config, 'WAV2VEC2_MODEL', 'Harveenchadha/vakyansh-wav2vec2-punjabi-pam-10')
+        },
+        "commercial": {
+            "enabled": getattr(config, 'USE_COMMERCIAL', False),
+            "apiKey": "",  # Don't expose API key
+            "provider": getattr(config, 'COMMERCIAL_PROVIDER', 'elevenlabs')
+        },
+        "processing": {
+            "denoising": getattr(config, 'ENABLE_DENOISING', False),
+            "denoiseBackend": getattr(config, 'DENOISE_BACKEND', 'noisereduce'),
+            "enableFusion": True,
+            "fusionThreshold": getattr(config, 'FUSION_AGREEMENT_THRESHOLD', 0.85)
+        },
+        "domain": {
+            "mode": getattr(config, 'DOMAIN_MODE', 'sggs'),
+            "strictGurmukhi": getattr(config, 'STRICT_GURMUKHI', True),
+            "enableCorrection": getattr(config, 'ENABLE_DOMAIN_CORRECTION', True),
+            "scriptPurityThreshold": getattr(config, 'SCRIPT_PURITY_THRESHOLD', 0.95),
+            "latinRatioThreshold": getattr(config, 'LATIN_RATIO_THRESHOLD', 0.02),
+            "oovRatioThreshold": getattr(config, 'OOV_RATIO_THRESHOLD', 0.35)
+        }
+    }
+    
+    # Try to load saved settings
+    if settings_file.exists():
+        try:
+            with open(settings_file, 'r', encoding='utf-8') as f:
+                saved_settings = json_lib.load(f)
+                # Merge saved with defaults (saved takes precedence)
+                for key, value in saved_settings.items():
+                    if key in default_settings:
+                        if isinstance(value, dict) and isinstance(default_settings[key], dict):
+                            default_settings[key].update(value)
+                        else:
+                            default_settings[key] = value
+        except Exception as e:
+            print(f"Failed to load settings file: {e}")
+    
+    return jsonify(default_settings)
+
+
+@app.route('/api/settings', methods=['POST'])
+def save_settings():
+    """Save settings to file."""
+    import json as json_lib
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    settings_file = config.SETTINGS_FILE
+    
+    # Ensure data directory exists
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Don't save sensitive data like API keys in plain text
+        safe_data = data.copy()
+        if 'commercial' in safe_data and 'apiKey' in safe_data['commercial']:
+            # Store API key securely (in env var or encrypted file)
+            api_key = safe_data['commercial'].get('apiKey', '')
+            if api_key:
+                # For now, just mask it in saved file
+                safe_data['commercial']['apiKey'] = '***masked***'
+                # Could also update environment or secure storage here
+        
+        with open(settings_file, 'w', encoding='utf-8') as f:
+            json_lib.dump(safe_data, f, indent=2)
+        
+        # Update orchestrator if running
+        orch = init_orchestrator()
+        if orch and 'primaryProvider' in data:
+            try:
+                orch.set_primary_provider(data['primaryProvider'])
+            except Exception as e:
+                print(f"Failed to update orchestrator provider: {e}")
+        
+        # Update domain settings if provided
+        if orch and 'domain' in data:
+            try:
+                domain_settings = data['domain']
+                orch.set_domain_mode(
+                    domain_settings.get('mode', 'sggs'),
+                    domain_settings.get('strictGurmukhi', True)
+                )
+            except Exception as e:
+                print(f"Failed to update domain settings: {e}")
+        
+        return jsonify({"status": "success", "message": "Settings saved"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/domain-settings', methods=['GET'])
+def get_domain_settings():
+    """Get current domain language prioritization settings."""
+    orch = init_orchestrator()
+    if orch:
+        return jsonify(orch.get_domain_mode())
+    
+    # Return defaults if orchestrator not initialized
+    return jsonify({
+        'domain_mode': getattr(config, 'DOMAIN_MODE', 'sggs'),
+        'strict_gurmukhi': getattr(config, 'STRICT_GURMUKHI', True),
+        'enable_domain_correction': getattr(config, 'ENABLE_DOMAIN_CORRECTION', True),
+    })
+
+
+@app.route('/api/domain-settings', methods=['POST'])
+def set_domain_settings():
+    """Update domain language prioritization settings."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    orch = init_orchestrator()
+    if not orch:
+        return jsonify({"error": "Orchestrator not available"}), 500
+    
+    try:
+        mode = data.get('domain_mode', 'sggs')
+        strict = data.get('strict_gurmukhi', True)
+        
+        orch.set_domain_mode(mode, strict)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Domain mode set to {mode}, strict_gurmukhi: {strict}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/test-commercial', methods=['POST'])
+def test_commercial_api():
+    """Test commercial API connection."""
+    data = request.get_json()
+    api_key = data.get('api_key', '')
+    
+    if not api_key:
+        return jsonify({"success": False, "error": "No API key provided"})
+    
+    try:
+        from asr.asr_commercial import ASRCommercial
+        
+        # Create temporary provider with test key
+        provider = ASRCommercial(api_key=api_key)
+        
+        # Test connection
+        if provider.check_api_health():
+            quota = provider.get_remaining_quota()
+            return jsonify({
+                "success": True,
+                "message": "Connection successful",
+                "quota": quota
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "API connection failed"
+            })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
 
 
 @app.route('/download/<path:filename>')
@@ -989,8 +1045,8 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"GPU test error (continuing anyway): {e}")
     
-    print("\nInitializing Whisper service...")
-    init_whisper()
+    print("\nInitializing Orchestrator service...")
+    init_orchestrator()
     
     # Phase 6: Initialize WebSocket server and live orchestrator
     print("\nInitializing WebSocket server for live mode...")

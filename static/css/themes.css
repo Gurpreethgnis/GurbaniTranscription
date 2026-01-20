@@ -1,6 +1,10 @@
 /**
  * Theme System for Katha Transcription
- * Two themes: Harmandir (cultural) and Midnight (modern)
+ * Four themes:
+ * - Harmandir (cultural, gold & ivory - light)
+ * - Dawn (soft warm tones - light)
+ * - Midnight (dark blue & silver - dark)
+ * - Amrit (deep teal & amber - dark)
  */
 
 :root {
@@ -66,6 +70,63 @@
 }
 
 /* ============================================
+   DAWN THEME (Soft Warm Tones - Light)
+   ============================================ */
+[data-theme="dawn"] {
+    /* Colors */
+    --color-primary: #E07A5F;
+    --color-primary-dark: #C66349;
+    --color-primary-light: #F0968A;
+    --color-secondary: #81B29A;
+    --color-accent: #3D405B;
+    
+    --color-bg: #FDF6F0;
+    --color-bg-secondary: #F8EDE3;
+    --color-bg-tertiary: #F2E5D7;
+    --color-surface: #FFFFFF;
+    --color-surface-hover: #FDF6F0;
+    
+    --color-text: #3D405B;
+    --color-text-secondary: #5C5F75;
+    --color-text-muted: #8A8D9F;
+    
+    --color-border: #E8DDD5;
+    --color-border-light: #F2E5D7;
+    
+    /* Sidebar */
+    --sidebar-bg: #F8EDE3;
+    --sidebar-border: #E8DDD5;
+    --sidebar-text: #3D405B;
+    --sidebar-hover: #F2E5D7;
+    --sidebar-active: #E07A5F;
+    --sidebar-active-text: #FFFFFF;
+    
+    /* Status Colors */
+    --color-success: #81B29A;
+    --color-success-bg: #E8F4ED;
+    --color-warning: #F2CC8F;
+    --color-warning-bg: #FDF6E3;
+    --color-error: #E07A5F;
+    --color-error-bg: #FDEAE6;
+    --color-info: #7FB3D5;
+    --color-info-bg: #E8F3F9;
+    
+    /* Typography */
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Noto Sans Gurmukhi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-gurmukhi: 'Noto Sans Gurmukhi', sans-serif;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(224, 122, 95, 0.08);
+    --shadow-md: 0 4px 12px rgba(224, 122, 95, 0.12);
+    --shadow-lg: 0 8px 24px rgba(224, 122, 95, 0.16);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #E07A5F 0%, #F2CC8F 100%);
+    --gradient-bg: linear-gradient(135deg, #FDF6F0 0%, #F8EDE3 100%);
+}
+
+/* ============================================
    MIDNIGHT THEME (Modern - Dark Blue & Silver)
    ============================================ */
 [data-theme="midnight"] {
@@ -120,6 +181,63 @@
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, #C0C0C0 0%, #00D4FF 100%);
     --gradient-bg: linear-gradient(135deg, #0D1B2A 0%, #1B263B 100%);
+}
+
+/* ============================================
+   AMRIT THEME (Deep Teal & Amber - Dark)
+   ============================================ */
+[data-theme="amrit"] {
+    /* Colors */
+    --color-primary: #F2A93B;
+    --color-primary-dark: #D89428;
+    --color-primary-light: #F5BE62;
+    --color-secondary: #2DD4BF;
+    --color-accent: #F97316;
+    
+    --color-bg: #0F172A;
+    --color-bg-secondary: #1E293B;
+    --color-bg-tertiary: #334155;
+    --color-surface: #1E293B;
+    --color-surface-hover: #334155;
+    
+    --color-text: #F1F5F9;
+    --color-text-secondary: #CBD5E1;
+    --color-text-muted: #94A3B8;
+    
+    --color-border: #475569;
+    --color-border-light: #334155;
+    
+    /* Sidebar */
+    --sidebar-bg: #1E293B;
+    --sidebar-border: #475569;
+    --sidebar-text: #F1F5F9;
+    --sidebar-hover: #334155;
+    --sidebar-active: #F2A93B;
+    --sidebar-active-text: #0F172A;
+    
+    /* Status Colors */
+    --color-success: #22C55E;
+    --color-success-bg: rgba(34, 197, 94, 0.15);
+    --color-warning: #F2A93B;
+    --color-warning-bg: rgba(242, 169, 59, 0.15);
+    --color-error: #EF4444;
+    --color-error-bg: rgba(239, 68, 68, 0.15);
+    --color-info: #2DD4BF;
+    --color-info-bg: rgba(45, 212, 191, 0.15);
+    
+    /* Typography */
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-gurmukhi: 'Noto Sans Gurmukhi', sans-serif;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #F2A93B 0%, #2DD4BF 100%);
+    --gradient-bg: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
 }
 
 /* Apply theme to body */

@@ -8,6 +8,9 @@
  * - Segment update/replacement
  */
 
+// Use shared utilities
+const { escapeHtml: escapeHtmlUtil, getConfidenceClass } = window.KathaUtils || {};
+
 class LiveTranscriptionClient {
     constructor() {
         this.socket = null;
@@ -348,6 +351,8 @@ class LiveTranscriptionClient {
     }
     
     escapeHtml(text) {
+        // Use shared utility if available, fallback to local implementation
+        if (escapeHtmlUtil) return escapeHtmlUtil(text);
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;

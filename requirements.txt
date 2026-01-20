@@ -49,6 +49,20 @@ scipy>=1.10.0                 # For audio resampling
 # Phase 8: Evaluation Harness
 jiwer>=3.0.0                  # WER/CER computation
 
+# Phase 12: Multi-Provider ASR Support
+# IndicConformer and Wav2Vec2 require transformers and torch
+transformers>=4.35.0          # HuggingFace transformers for IndicConformer/Wav2Vec2
+torch>=2.0.0                  # PyTorch backend (CPU version, GPU optional)
+# For GPU support, install torch with CUDA:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu118
+
+# Commercial API support (ElevenLabs)
+httpx>=0.25.0                 # Async HTTP client for commercial APIs
+
+# CLI enhancements
+click>=8.1.0                  # CLI framework (optional, argparse is built-in)
+rich>=13.0.0                  # Rich terminal output and progress bars
+
 # Phase 11: Document Formatting and Export
 python-docx>=1.1.0            # DOCX document generation
 weasyprint>=62.0               # PDF generation from HTML (or use reportlab as fallback)

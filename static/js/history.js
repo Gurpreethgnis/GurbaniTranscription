@@ -2,6 +2,9 @@
  * History page JavaScript for viewing and downloading transcriptions.
  */
 
+// Use shared utilities
+const { escapeHtml, createExportDropdown } = window.KathaUtils || {};
+
 const historyContainer = document.getElementById('historyContainer');
 const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
 
@@ -86,8 +89,4 @@ function exportFromHistory(filename, format) {
     window.location.href = `/export/${encodeURIComponent(filename)}/${format}`;
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Note: escapeHtml is now imported from utils.js

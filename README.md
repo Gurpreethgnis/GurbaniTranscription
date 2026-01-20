@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/license-personal%20use-lightgrey)
 
-**Multi-ASR Ensemble** | **Gurbani Detection** | **Live Mode** | **Script Conversion** | **Audio Denoising**
+**Multi-ASR Ensemble** | **Gurbani Detection** | **Live Mode** | **Script Conversion** | **Audio Denoising** | **CLI Tool**
 
 [Quick Start](#-quick-start) • [Features](#-key-features) • [Installation](#-installation) • [API Docs](#-api-documentation) • [Troubleshooting](#-troubleshooting)
 
@@ -32,12 +32,14 @@ A **production-grade automatic speech recognition (ASR) system** specifically de
 ### 🎯 Core Capabilities
 
 - **Multi-ASR Ensemble**: Combines Whisper Large, Indic-tuned Whisper, and English Whisper for optimal accuracy
+- **Multiple ASR Providers**: Choose from faster-whisper, AI4Bharat IndicConformer, Wav2Vec2 Punjabi, or commercial APIs
 - **Intelligent Fusion**: Voting algorithms and confidence merging across multiple ASR engines
 - **Canonical Gurbani Detection**: Automatically detects and replaces Gurbani quotes with exact canonical text from SGGS and Dasam Granth databases
 - **Script Conversion**: Automatic Shahmukhi → Gurmukhi conversion and Gurmukhi → Roman transliteration
 - **Live Transcription**: Real-time WebSocket-based transcription with <2s draft latency and <5s verified updates
 - **Audio Denoising**: Optional noise reduction for improved accuracy on noisy recordings
 - **Multi-Format Export**: Export transcriptions as TXT, JSON, Markdown, HTML, DOCX, or PDF
+- **CLI Tool**: Full command-line interface for batch processing and scripting
 
 ### 🌐 Language & Script Support
 
@@ -172,6 +174,66 @@ python app.py
    - Gurmukhi/Roman toggle
    - Quote highlighting with metadata
 
+### CLI Tool
+
+Use the command-line interface for batch processing:
+
+```bash
+# Basic usage
+python -m cli.transcribe audio.wav
+
+# Choose ASR provider
+python -m cli.transcribe audio.mp3 --model indicconformer
+
+# Output formats (json, txt, srt)
+python -m cli.transcribe folder/ --out srt
+
+# Full options
+python -m cli.transcribe audio.wav --model wav2vec2 --language pa --out txt
+
+# List available providers
+python -m cli.transcribe --list-providers
+```
+
+**CLI Options:**
+| Option | Description |
+|--------|-------------|
+| `--model`, `-m` | ASR provider: `whisper`, `indicconformer`, `wav2vec2`, `commercial` |
+| `--out`, `-o` | Output format: `json`, `txt`, `srt` |
+| `--language`, `-l` | Language hint (default: `pa` for Punjabi) |
+| `--timestamps/--no-timestamps` | Include timestamps in output |
+| `--output-dir`, `-d` | Output directory |
+| `--list-providers` | List available ASR providers |
+
+---
+
+## 🎤 ASR Provider Options
+
+The system supports multiple ASR providers for different use cases:
+
+| Provider | Model | Best For | Timestamps |
+|----------|-------|----------|------------|
+| **Whisper** | faster-whisper (large) | General multilingual, best all-around | ✓ Word-level |
+| **IndicConformer** | AI4Bharat | Indian languages, native Gurmukhi | ✓ Segment |
+| **Wav2Vec2** | Punjabi fine-tuned | Direct Punjabi transcription | Limited |
+| **Commercial** | ElevenLabs Scribe | High accuracy, API-based | ✓ Word-level |
+
+### Provider Configuration
+
+Configure providers via environment variables or the Settings page (`/settings`):
+
+```bash
+# Set primary provider
+export ASR_PRIMARY_PROVIDER=indicconformer
+
+# Set fallback provider
+export ASR_FALLBACK_PROVIDER=whisper
+
+# Commercial API (optional)
+export USE_COMMERCIAL=true
+export COMMERCIAL_API_KEY=your_api_key
+```
+
 ---
 
 ## ⚙️ Configuration
@@ -224,6 +286,7 @@ See `config.py` for all available settings including:
 |--------|----------|-------------|
 | `GET` | `/` | Main application page |
 | `GET` | `/live` | Live transcription page |
+| `GET` | `/settings` | Settings configuration page |
 | `GET` | `/status` | Server and model status |
 | `POST` | `/upload` | Upload audio file |
 | `POST` | `/transcribe-v2` | Transcribe with multi-ASR ensemble |
@@ -231,6 +294,10 @@ See `config.py` for all available settings including:
 | `GET` | `/log` | Get processing log |
 | `GET` | `/download/<filename>` | Download transcription file |
 | `GET` | `/export/<filename>/<format>` | Export in format (txt, json, markdown, html, docx, pdf) |
+| `GET` | `/api/providers` | List available ASR providers |
+| `GET` | `/api/settings` | Get current settings |
+| `POST` | `/api/settings` | Update settings |
+| `POST` | `/api/test-commercial` | Test commercial API connection |
 
 ### WebSocket Events
 
@@ -287,10 +354,16 @@ KathaTranscription/
 │   ├── build_embedding_index.py
 │   └── start_server.bat
 ├── asr/                      # ASR engines
-│   ├── asr_whisper.py        # ASR-A: Whisper Large
+│   ├── asr_whisper.py        # ASR-A: Whisper Large (faster-whisper)
 │   ├── asr_indic.py          # ASR-B: Indic-tuned Whisper
 │   ├── asr_english_fallback.py  # ASR-C: English Whisper
-│   └── asr_fusion.py         # Fusion layer
+│   ├── asr_indicconformer.py # AI4Bharat IndicConformer
+│   ├── asr_wav2vec2.py       # Wav2Vec2 Punjabi
+│   ├── asr_commercial.py     # ElevenLabs commercial API
+│   ├── asr_fusion.py         # Fusion layer
+│   └── provider_registry.py  # Multi-provider management
+├── cli/                      # Command-line interface
+│   └── transcribe.py         # CLI transcription tool
 ├── audio/                    # Audio processing
 │   ├── denoiser.py           # Audio denoising
 │   └── audio_utils.py        # Audio utilities

@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - KathaTranscription{% endblock %}
+
+{% block nav_settings_active %}active{% endblock %}
+
+{% block content %}
+    <header class="page-header">
+        <h1>Settings</h1>
+        <p class="subtitle">Configure ASR providers, models, and processing options</p>
+    </header>
+
+    <!-- Provider Selection Section -->
+    <section class="settings-section">
+        <div class="section-header">
+            <h2>ASR Provider Configuration</h2>
+            <span class="section-badge" id="providerStatus">Loading...</span>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Primary Provider</h3>
+            <p class="settings-description">Select the main ASR engine for transcription</p>
+            
+            <div class="provider-grid" id="primaryProviderGrid">
+                <!-- Provider cards will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Fallback Provider</h3>
+            <p class="settings-description">Used when primary provider fails or for ensemble fusion</p>
+            
+            <div class="provider-select-row">
+                <select id="fallbackProvider" class="settings-select">
+                    <option value="">None (No fallback)</option>
+                    <option value="whisper">Whisper (faster-whisper)</option>
+                    <option value="indicconformer">IndicConformer (AI4Bharat)</option>
+                    <option value="wav2vec2">Wav2Vec2 Punjabi</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- Model Configuration Section -->
+    <section class="settings-section">
+        <div class="section-header">
+            <h2>Model Configuration</h2>
+        </div>
+        
+        <!-- Whisper Settings -->
+        <div class="settings-card collapsible" data-provider="whisper">
+            <div class="card-header" onclick="toggleCard(this)">
+                <h3>
+                    <span class="provider-icon">🎤</span>
+                    Whisper (faster-whisper)
+                </h3>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content">
+                <div class="settings-row">
+                    <label for="whisperModel">Model Size:</label>
+                    <select id="whisperModel" class="settings-select">
+                        <option value="tiny">Tiny (39M params) - Fastest</option>
+                        <option value="base">Base (74M params)</option>
+                        <option value="small">Small (244M params)</option>
+                        <option value="medium">Medium (769M params)</option>
+                        <option value="large" selected>Large (1550M params)</option>
+                        <option value="large-v2">Large-v2</option>
+                        <option value="large-v3">Large-v3 - Best accuracy</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label>Supported Languages:</label>
+                    <span class="language-tags">
+                        <span class="tag">Punjabi (pa)</span>
+                        <span class="tag">Hindi (hi)</span>
+                        <span class="tag">Urdu (ur)</span>
+                        <span class="tag">English (en)</span>
+                        <span class="tag">Auto-detect</span>
+                    </span>
+                </div>
+                <div class="settings-row">
+                    <label>Features:</label>
+                    <span class="feature-list">
+                        <span class="feature">✓ Timestamps</span>
+                        <span class="feature">✓ Word-level timing</span>
+                        <span class="feature">✓ GPU acceleration</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- IndicConformer Settings -->
+        <div class="settings-card collapsible" data-provider="indicconformer">
+            <div class="card-header" onclick="toggleCard(this)">
+                <h3>
+                    <span class="provider-icon">🇮🇳</span>
+                    IndicConformer (AI4Bharat)
+                </h3>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content">
+                <div class="settings-row">
+                    <label for="indicconformerModel">Model:</label>
+                    <input type="text" id="indicconformerModel" class="settings-input" 
+                           value="ai4bharat/indicconformer_stt_hi_hybrid_rnnt_large"
+                           placeholder="HuggingFace model ID">
+                </div>
+                <div class="settings-row">
+                    <label for="indicconformerLanguage">Default Language:</label>
+                    <select id="indicconformerLanguage" class="settings-select">
+                        <option value="pa" selected>Punjabi</option>
+                        <option value="hi">Hindi</option>
+                        <option value="bn">Bengali</option>
+                        <option value="gu">Gujarati</option>
+                        <option value="ta">Tamil</option>
+                        <option value="te">Telugu</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label>Features:</label>
+                    <span class="feature-list">
+                        <span class="feature">✓ Native Indic support</span>
+                        <span class="feature">✓ Timestamps</span>
+                        <span class="feature">✓ Gurmukhi script</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Wav2Vec2 Settings -->
+        <div class="settings-card collapsible" data-provider="wav2vec2">
+            <div class="card-header" onclick="toggleCard(this)">
+                <h3>
+                    <span class="provider-icon">🔊</span>
+                    Wav2Vec2 Punjabi
+                </h3>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content">
+                <div class="settings-row">
+                    <label for="wav2vec2Model">Model:</label>
+                    <input type="text" id="wav2vec2Model" class="settings-input" 
+                           value="Harveenchadha/vakyansh-wav2vec2-punjabi-pam-10"
+                           placeholder="HuggingFace model ID">
+                </div>
+                <div class="settings-row">
+                    <label>Supported Languages:</label>
+                    <span class="language-tags">
+                        <span class="tag primary">Punjabi (pa)</span>
+                    </span>
+                </div>
+                <div class="settings-row">
+                    <label>Features:</label>
+                    <span class="feature-list">
+                        <span class="feature">✓ Native Punjabi</span>
+                        <span class="feature">✓ Direct Gurmukhi</span>
+                        <span class="feature warning">⚠ Limited timestamps</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Commercial Provider Settings -->
+        <div class="settings-card collapsible" data-provider="commercial">
+            <div class="card-header" onclick="toggleCard(this)">
+                <h3>
+                    <span class="provider-icon">💼</span>
+                    Commercial Provider (ElevenLabs)
+                </h3>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content">
+                <div class="settings-row">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="commercialEnabled" name="commercialEnabled">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">Enable Commercial Provider</span>
+                    </label>
+                </div>
+                <div class="settings-row commercial-field">
+                    <label for="commercialApiKey">API Key:</label>
+                    <div class="api-key-input">
+                        <input type="password" id="commercialApiKey" class="settings-input" 
+                               placeholder="Enter your ElevenLabs API key">
+                        <button type="button" class="btn-icon" onclick="toggleApiKeyVisibility()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row commercial-field">
+                    <label for="commercialProvider">Provider:</label>
+                    <select id="commercialProvider" class="settings-select">
+                        <option value="elevenlabs" selected>ElevenLabs Scribe</option>
+                    </select>
+                </div>
+                <div class="settings-row commercial-field">
+                    <button type="button" class="btn-secondary" onclick="testCommercialApi()">
+                        Test API Connection
+                    </button>
+                    <span id="apiTestResult" class="test-result"></span>
+                </div>
+                <div class="settings-row">
+                    <label>Features:</label>
+                    <span class="feature-list">
+                        <span class="feature">✓ High accuracy</span>
+                        <span class="feature">✓ Word timestamps</span>
+                        <span class="feature">✓ Multiple languages</span>
+                        <span class="feature warning">⚠ Requires API key</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Processing Settings Section -->
+    <section class="settings-section">
+        <div class="section-header">
+            <h2>Default Processing Options</h2>
+            <p class="section-description">These settings will be used as defaults for new transcriptions</p>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Audio Processing</h3>
+            
+            <div class="settings-row">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="defaultDenoising" name="defaultDenoising">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">Enable Denoising by Default</span>
+                </label>
+            </div>
+            
+            <div class="settings-row">
+                <label for="defaultDenoiseBackend">Denoising Backend:</label>
+                <select id="defaultDenoiseBackend" class="settings-select">
+                    <option value="noisereduce" selected>NoiseReduce (Default)</option>
+                    <option value="facebook">Facebook Denoiser</option>
+                    <option value="deepfilter">DeepFilterNet</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Multi-ASR Fusion</h3>
+            
+            <div class="settings-row">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="enableFusion" name="enableFusion" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">Enable Multi-ASR Fusion</span>
+                </label>
+            </div>
+            
+            <div class="settings-row">
+                <label for="fusionThreshold">Agreement Threshold:</label>
+                <input type="range" id="fusionThreshold" min="0.5" max="1.0" step="0.05" value="0.85" class="settings-slider">
+                <span id="fusionThresholdValue" class="slider-value">0.85</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Domain Language Prioritization Section -->
+    <section class="settings-section">
+        <div class="section-header">
+            <h2>Domain Language Prioritization</h2>
+            <p class="section-description">Constrain transcription to authentic Gurbani linguistic patterns</p>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Domain Mode</h3>
+            <p class="card-description">Select the target domain to optimize language prioritization</p>
+            
+            <div class="options-group domain-options">
+                <label class="option-card">
+                    <input type="radio" name="domainMode" value="sggs" checked>
+                    <span class="option-content">
+                        <span class="option-title">SGGS Mode</span>
+                        <span class="option-description">Optimized for Sri Guru Granth Sahib Ji - prioritizes Sant Bhasha, Braj, Old Punjabi</span>
+                    </span>
+                </label>
+                <label class="option-card">
+                    <input type="radio" name="domainMode" value="dasam">
+                    <span class="option-content">
+                        <span class="option-title">Dasam Mode</span>
+                        <span class="option-description">Optimized for Dasam Granth - prioritizes Braj, Sanskrit, poetic register</span>
+                    </span>
+                </label>
+                <label class="option-card">
+                    <input type="radio" name="domainMode" value="generic">
+                    <span class="option-content">
+                        <span class="option-title">Generic Punjabi</span>
+                        <span class="option-description">Modern Punjabi base - less constrained, suitable for general Katha</span>
+                    </span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Script Enforcement</h3>
+            
+            <div class="settings-row">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="strictGurmukhi" name="strictGurmukhi" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">Strict Gurmukhi Output</span>
+                </label>
+                <span class="setting-help">Reject/repair non-Gurmukhi characters in output</span>
+            </div>
+            
+            <div class="settings-row">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="enableDomainCorrection" name="enableDomainCorrection" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">Enable Domain Correction</span>
+                </label>
+                <span class="setting-help">Apply domain-constrained spelling correction</span>
+            </div>
+        </div>
+        
+        <div class="settings-card">
+            <h3>Anti-Drift Thresholds</h3>
+            <p class="card-description">Configure detection thresholds for script/language drift</p>
+            
+            <div class="settings-row">
+                <label for="scriptPurityThreshold">Script Purity Threshold:</label>
+                <input type="range" id="scriptPurityThreshold" min="0.8" max="1.0" step="0.01" value="0.95" class="settings-slider">
+                <span id="scriptPurityThresholdValue" class="slider-value">0.95</span>
+            </div>
+            
+            <div class="settings-row">
+                <label for="latinRatioThreshold">Max Latin Ratio:</label>
+                <input type="range" id="latinRatioThreshold" min="0.0" max="0.1" step="0.01" value="0.02" class="settings-slider">
+                <span id="latinRatioThresholdValue" class="slider-value">0.02</span>
+            </div>
+            
+            <div class="settings-row">
+                <label for="oovRatioThreshold">Max OOV Ratio:</label>
+                <input type="range" id="oovRatioThreshold" min="0.1" max="0.5" step="0.05" value="0.35" class="settings-slider">
+                <span id="oovRatioThresholdValue" class="slider-value">0.35</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Actions Section -->
+    <section class="settings-actions">
+        <button type="button" class="btn-primary" onclick="saveSettings()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Save Settings
+        </button>
+        <button type="button" class="btn-secondary" onclick="resetSettings()">
+            Reset to Defaults
+        </button>
+        <span id="saveStatus" class="save-status"></span>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="/static/js/settings.js"></script>
+{% endblock %}
+

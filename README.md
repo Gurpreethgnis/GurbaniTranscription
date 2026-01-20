@@ -8,7 +8,7 @@
 
 **Multi-ASR Ensemble** | **Gurbani Detection** | **Live Mode** | **Script Conversion** | **Audio Denoising** | **CLI Tool**
 
-[Quick Start](#-quick-start) • [Features](#-key-features) • [Installation](#-installation) • [API Docs](#-api-documentation) • [Troubleshooting](#-troubleshooting)
+[Quick Start](#-quick-start) • [Features](#-key-features) • [Installation](#-installation) • [API Docs](#-api-documentation) • [Troubleshooting](#-troubleshooting) • [**📖 Onboarding Guide**](docs/ONBOARDING_GUIDE.md)
 
 </div>
 
@@ -24,6 +24,19 @@ A **production-grade automatic speech recognition (ASR) system** specifically de
 - Real-time live transcription with WebSocket support
 - Detecting and replacing Gurbani quotes with canonical text
 - Multi-language audio processing (Punjabi, Hindi, English, mixed)
+
+---
+
+## 📖 New to the System?
+
+**[Read the Comprehensive Onboarding Guide →](docs/ONBOARDING_GUIDE.md)**
+
+The onboarding guide provides detailed explanations of every feature:
+- **What** each feature does
+- **Why** it exists and when to use it
+- **How** to configure and use it effectively
+
+Covers: File Transcription, Live Mode, Shabad Mode, Multi-ASR Ensemble, Quote Detection, Script Conversion, Audio Denoising, Export Formats, CLI Tool, and more.
 
 ---
 

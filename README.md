@@ -4,9 +4,9 @@
 
 <img src="static/logo.svg" alt="Shabad Guru Logo" width="200" height="200">
 
-### *Voice to Sacred Text*
+### *Breaking Language Barriers to Guru's Wisdom*
 
-**Transform spoken Gurbani into accurate, canonical Gurmukhi transcription**
+**Recognize shabads & pramans from kirtan. Transcribe & translate katha. Make Gurbani accessible to all.**
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-1f2a6d)
 ![Flask](https://img.shields.io/badge/flask-websocket-d6a21f)
@@ -20,13 +20,22 @@
 
 ## ੴ What is Shabad Guru?
 
-**Shabad Guru** (ਸ਼ਬਦ ਗੁਰੂ — "The Word is the Guru") transforms spoken Punjabi and Gurbani into accurate Gurmukhi text. It combines multiple speech recognition engines with intelligent quote detection to produce transcriptions that automatically replace detected Gurbani with canonical scripture text.
+**Shabad Guru** (ਸ਼ਬਦ ਗੁਰੂ — "The Word is the Guru") ensures that language is no longer a barrier to understanding Guru's words and the vichaar (discourse) from their pyare (beloved Gursikhs).
 
-**Built for:**
-- Transcribing Sikh religious lectures (*katha*)
-- Real-time live transcription of discourses
-- Kirtan transcription with praman (scriptural evidence) suggestions
-- Converting Punjabi/Hindi/English audio to text with Gurmukhi output
+This platform:
+- **Recognizes shabads and pramans** from spoken words during live or recorded kirtan
+- **Transcribes katha** — both historical recordings and live discourses — into accurate Gurmukhi text
+- **Enables translation** so the wisdom reaches everyone regardless of language background
+- **Detects Gurbani quotes** and replaces them with canonical scripture text from SGGS and Dasam Granth
+
+Whether you're preserving a historic katha recording, following along with live kirtan, or making Sikh teachings accessible to those who don't speak Punjabi — Shabad Guru bridges the gap between spoken word and sacred text.
+
+**Use cases:**
+- 🎵 **Kirtan** — Recognize which shabad is being sung, see pramans in real-time
+- 🎤 **Live Katha** — Real-time transcription of discourses as they happen
+- 📚 **Historical Katha** — Transcribe recordings from Sant Mahapurakhs and scholars
+- 🌍 **Translation** — Break language barriers for non-Punjabi speakers
+- 📖 **Praman Discovery** — Find supporting and contrasting scriptural evidence
 
 ---
 

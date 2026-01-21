@@ -1,5 +1,6 @@
 /**
- * Main Stylesheet for Katha Transcription Application
+ * Main Stylesheet for Shabad Guru (ਸ਼ਬਦ ਗੁਰੂ) Application
+ * Gurbani Transcription & Praman Discovery Platform
  * Uses CSS variables from themes.css for theming support
  */
 
@@ -60,6 +61,53 @@ body {
     align-items: center;
 }
 
+/* New Logo Styles for Shabad Guru */
+.sidebar-logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.sidebar-logo-img {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.sidebar-logo-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.logo-english {
+    font-family: 'Cormorant Garamond', var(--font-heading);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    letter-spacing: 0.02em;
+}
+
+.logo-gurmukhi {
+    font-family: 'Noto Sans Gurmukhi', var(--font-gurmukhi);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--sidebar-text);
+    opacity: 0.85;
+}
+
+.sidebar.collapsed .sidebar-logo-text {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-logo-img {
+    width: 36px;
+    height: 36px;
+}
+
+/* Legacy support */
 .sidebar-logo {
     font-family: var(--font-heading);
     font-size: 1.75rem;

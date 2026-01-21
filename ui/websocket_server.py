@@ -53,7 +53,7 @@ class WebSocketServer:
             cors_allowed_origins="*",
             ping_interval=getattr(config, 'WEBSOCKET_PING_INTERVAL', 25),
             ping_timeout=getattr(config, 'WEBSOCKET_PING_TIMEOUT', 120),
-            async_mode='eventlet'  # Use eventlet for async support
+            async_mode='threading'  # Use threading for broader compatibility
         )
         self.orchestrator_callback = orchestrator_callback
         self.shabad_callback = shabad_callback
@@ -630,4 +630,4 @@ class WebSocketServer:
             debug: Enable debug mode
         """
         logger.info(f"Starting WebSocket server on {host}:{port}")
-        self.socketio.run(self.app, host=host, port=port, debug=debug)
+        self.socketio.run(self.app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=True)

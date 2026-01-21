@@ -1252,8 +1252,8 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"GPU test error (continuing anyway): {e}")
     
-    print("\nInitializing Orchestrator service...")
-    init_orchestrator()
+    # Lazy-load orchestrator on first request to speed up startup
+    print(f"\nOrchestrator will be initialized on first request (using {config.WHISPER_MODEL_SIZE} model)...")
     
     # Phase 6: Initialize WebSocket server and live orchestrator
     print("\nInitializing WebSocket server for live mode...")

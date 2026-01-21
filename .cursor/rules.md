@@ -318,6 +318,53 @@ At the end of EVERY phase implementation, you MUST:
 
 ---
 
+## 1️⃣1️⃣ README UPDATE TRIGGERS (MANDATORY)
+
+**ALWAYS update README.md when any of the following changes occur:**
+
+### Feature Changes (MUST update README)
+- [ ] New API endpoint added
+- [ ] New CLI option added
+- [ ] New configuration setting added
+- [ ] New export format added
+- [ ] New ASR provider integrated
+- [ ] New mode or page added (e.g., /shabad, /history)
+- [ ] New service or capability added
+
+### Structure Changes (MUST update README)
+- [ ] New directory or module created
+- [ ] Significant file reorganization
+- [ ] New dependencies added to requirements.txt
+- [ ] Docker configuration changed
+
+### Documentation Changes (MUST update README)
+- [ ] Installation steps changed
+- [ ] Quick start process modified
+- [ ] Troubleshooting solutions added
+- [ ] Configuration options changed
+
+### README Update Checklist
+When updating README.md, ensure:
+1. **Features section** reflects all current capabilities
+2. **API Documentation** includes all endpoints
+3. **Project Structure** matches actual directory tree
+4. **Configuration** documents all environment variables
+5. **CLI Options** are complete and accurate
+6. **Testing section** has correct commands
+7. **"Last updated" date** at bottom is current
+
+### Auto-Reminder
+If you make changes to any of the following files, consider if README needs updating:
+- `app.py` (routes, endpoints)
+- `config.py` (settings)
+- `cli/transcribe.py` (CLI options)
+- `requirements.txt` (dependencies)
+- Any new files in `services/`, `asr/`, `exports/`
+
+**When in doubt, update the README!**
+
+---
+
 ## 🚨 FINAL RULE
 
 If you are unsure:

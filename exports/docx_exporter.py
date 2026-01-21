@@ -69,7 +69,7 @@ class DOCXExporter(BaseExporter):
         
         # Set document properties
         doc.core_properties.title = document.title
-        doc.core_properties.author = "KathaTranscription"
+        doc.core_properties.author = "Shabad Guru"
         
         # Add title
         title_para = doc.add_heading(document.title, level=0)

@@ -1,5 +1,6 @@
 """
-Configuration settings for the Katha Transcription Application.
+Configuration settings for Shabad Guru (ਸ਼ਬਦ ਗੁਰੂ)
+Gurbani Transcription & Praman Discovery Platform
 
 Organized into logical sections:
 1. Core Settings (paths, directories)
@@ -43,14 +44,33 @@ PROCESSING_TIMEOUT = 3600  # Timeout in seconds (1 hour)
 # ASR / MODEL CONFIGURATION
 # ============================================
 
-# Primary Whisper model (ASR-A)
-WHISPER_MODEL_SIZE = "large"  # Options: tiny, base, small, medium, large, large-v2, large-v3
-# Using 'large' for best accuracy with Punjabi/Urdu and mixed languages
-# With 12GB GPU VRAM, 'large' model fits comfortably (~1.5GB)
+# Dynamic GPU detection
+def _detect_gpu():
+    """Detect if CUDA GPU is available."""
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
 
-# GPU enforcement
-# Set to True to prevent CPU fallback for ASR
-REQUIRE_GPU = os.getenv("REQUIRE_GPU", "true").lower() == "true"
+GPU_AVAILABLE = _detect_gpu()
+
+# Primary Whisper model (ASR-A) - dynamic selection based on GPU availability
+# Options: tiny, base, small, medium, large, large-v2, large-v3
+_env_model = os.getenv("WHISPER_MODEL_SIZE")
+if _env_model:
+    WHISPER_MODEL_SIZE = _env_model  # Use environment variable if set
+elif GPU_AVAILABLE:
+    WHISPER_MODEL_SIZE = "large-v3"  # Best accuracy with GPU
+else:
+    WHISPER_MODEL_SIZE = "small"  # Good balance of speed/accuracy for CPU
+
+# GPU enforcement - auto-detect if not explicitly set
+_require_gpu_env = os.getenv("REQUIRE_GPU")
+if _require_gpu_env is not None:
+    REQUIRE_GPU = _require_gpu_env.lower() == "true"
+else:
+    REQUIRE_GPU = False  # Don't require GPU, allow CPU fallback
 
 # Language hints (for better accuracy with Punjabi/Urdu)
 LANGUAGE_HINTS = ["pa", "ur", "en"]  # Punjabi, Urdu, English

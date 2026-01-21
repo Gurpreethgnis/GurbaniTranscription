@@ -10,9 +10,18 @@ Features: High accuracy, word-level timestamps, multiple languages
 import logging
 import tempfile
 import time
+import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import json
+
+# Fix SSL certificate issues on macOS
+try:
+    import certifi
+    os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
+except ImportError:
+    pass
 
 import config
 from core.models import AudioChunk, ASRResult, Segment
@@ -183,17 +192,16 @@ class ASRCommercial:
         with open(audio_path, "rb") as f:
             audio_bytes = f.read()
         
-        # Prepare request
+        # Prepare request - ElevenLabs expects "file" parameter
         files = {
-            "audio": (audio_path.name, audio_bytes, "audio/wav")
+            "file": (audio_path.name, audio_bytes, "audio/wav")
         }
         
-        data = {}
+        data = {
+            "model_id": "scribe_v1"  # ElevenLabs Scribe model
+        }
         if lang_param:
-            data["language"] = lang_param
-        
-        # Add model selection for better Punjabi support
-        data["model"] = "scribe_v1"  # Or specific model for Indic
+            data["language_code"] = lang_param
         
         response = self._make_request("POST", url, files=files, data=data)
         
@@ -389,21 +397,25 @@ class ASRCommercial:
             True if API is healthy
         """
         try:
-            # Simple health check - try to access API
+            # Health check - try speech-to-text endpoint with empty request
+            # This validates API key without needing special permissions
             if self.provider == "elevenlabs":
-                url = f"{self.ELEVENLABS_BASE_URL}/user"
+                url = f"{self.ELEVENLABS_BASE_URL}{self.ELEVENLABS_TRANSCRIBE_ENDPOINT}"
                 headers = {
                     "xi-api-key": self.api_key,
                     "Accept": "application/json"
                 }
                 
+                # Send minimal request - will fail with validation error if key is valid
                 if self._use_httpx:
                     with httpx.Client(timeout=10) as client:
-                        response = client.get(url, headers=headers)
-                        return response.status_code == 200
+                        response = client.post(url, headers=headers, json={})
+                        # 422 = validation error (key valid but missing params)
+                        # 401/403 = invalid key
+                        return response.status_code in [200, 422]
                 else:
-                    response = requests.get(url, headers=headers, timeout=10)
-                    return response.status_code == 200
+                    response = requests.post(url, headers=headers, json={}, timeout=10)
+                    return response.status_code in [200, 422]
             
             return False
         except Exception as e:

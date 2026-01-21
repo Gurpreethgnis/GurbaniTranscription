@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Translation - Shabad Guru{% endblock %}
+
+{% block nav_translate_active %}active{% endblock %}
+
+{% block content %}
+    <header class="page-header">
+        <h1>Translation</h1>
+        <p class="subtitle">Translate transcriptions from Punjabi or English to other languages</p>
+    </header>
+
+    <!-- Transcription Selection Section -->
+    <section class="transcription-selection">
+        <h2>Select Transcription</h2>
+        <div class="selection-controls">
+            <select id="transcriptionSelect" class="transcription-select">
+                <option value="">Loading transcriptions...</option>
+            </select>
+            <button id="loadBtn" class="btn-primary" disabled>Load</button>
+        </div>
+        <div id="transcriptionInfo" class="transcription-info" style="display: none;">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Source Language</span>
+                    <span class="info-value" id="sourceLanguage">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Segments</span>
+                    <span class="info-value" id="segmentCount">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Duration</span>
+                    <span class="info-value" id="duration">-</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Language Selection Section -->
+    <section class="language-selection" id="languageSection" style="display: none;">
+        <h2>Select Target Languages</h2>
+        <p class="section-hint">Select languages to translate to. "Cached" means existing translations are available.</p>
+        
+        <div class="language-grid" id="languageGrid">
+            <!-- Languages will be populated by JavaScript -->
+        </div>
+        
+        <div class="translation-actions">
+            <button id="translateBtn" class="btn-primary btn-large" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 8l6 6"></path>
+                    <path d="M4 14l6-6 2-3"></path>
+                    <path d="M2 5h12"></path>
+                    <path d="M7 2h1"></path>
+                    <path d="M22 22l-5-10-5 10"></path>
+                    <path d="M14 18h6"></path>
+                </svg>
+                Translate Selected
+            </button>
+            <span class="selected-count" id="selectedCount">0 languages selected</span>
+        </div>
+    </section>
+
+    <!-- Progress Section -->
+    <section class="translation-progress-section" id="progressSection" style="display: none;">
+        <h2>Translation Progress</h2>
+        <div class="progress-container">
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+            <div class="progress-text" id="progressText">Preparing...</div>
+        </div>
+        <div class="progress-details" id="progressDetails"></div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="translation-results-section" id="resultsSection" style="display: none;">
+        <h2>Translation Results</h2>
+        <div class="results-tabs" id="resultsTabs">
+            <!-- Tabs will be populated by JavaScript -->
+        </div>
+        <div class="results-content" id="resultsContent">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+        <div class="results-actions">
+            <button id="downloadAllBtn" class="btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download All Translations
+            </button>
+            <button id="copyBtn" class="btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy Current
+            </button>
+        </div>
+    </section>
+
+    <!-- Provider Settings Section -->
+    <section class="provider-settings-section">
+        <div class="section-header">
+            <h2>Translation Provider</h2>
+            <button id="toggleProviderBtn" class="btn-toggle" aria-expanded="false">
+                <span class="toggle-icon">▼</span>
+                <span class="toggle-text">Show Settings</span>
+            </button>
+        </div>
+        <div id="providerPanel" class="provider-panel" style="display: none;">
+            <div class="provider-options">
+                <div class="provider-option">
+                    <input type="radio" name="provider" id="providerAuto" value="auto" checked>
+                    <label for="providerAuto">
+                        <span class="provider-name">Auto</span>
+                        <span class="provider-desc">Use best available provider (cached → Google → fallback)</span>
+                    </label>
+                </div>
+                <div class="provider-option">
+                    <input type="radio" name="provider" id="providerGoogle" value="google">
+                    <label for="providerGoogle">
+                        <span class="provider-name">Google Cloud Translation</span>
+                        <span class="provider-desc">High quality, wide language support</span>
+                        <span class="provider-status" id="googleStatus"></span>
+                    </label>
+                </div>
+                <div class="provider-option">
+                    <input type="radio" name="provider" id="providerAzure" value="azure">
+                    <label for="providerAzure">
+                        <span class="provider-name">Azure Translator</span>
+                        <span class="provider-desc">Microsoft's translation service</span>
+                        <span class="provider-status" id="azureStatus"></span>
+                    </label>
+                </div>
+                <div class="provider-option">
+                    <input type="radio" name="provider" id="providerOpenai" value="openai">
+                    <label for="providerOpenai">
+                        <span class="provider-name">OpenAI GPT</span>
+                        <span class="provider-desc">Context-aware spiritual translations</span>
+                        <span class="provider-status" id="openaiStatus"></span>
+                    </label>
+                </div>
+                <div class="provider-option">
+                    <input type="radio" name="provider" id="providerLibre" value="libre">
+                    <label for="providerLibre">
+                        <span class="provider-name">LibreTranslate</span>
+                        <span class="provider-desc">Open-source, self-hosted option</span>
+                        <span class="provider-status" id="libreStatus"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Status Section -->
+    <section class="status-section">
+        <div id="statusMessage" class="status-message"></div>
+    </section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="/static/js/translate.js"></script>
+{% endblock %}
+

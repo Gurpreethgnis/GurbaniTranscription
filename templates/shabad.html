@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Shabad Mode - Live Kirtan Detection{% endblock %}
+{% block title %}Kirtan Mode - Shabad Guru{% endblock %}
 
 {% block nav_shabad_active %}active{% endblock %}
 
 {% block content %}
     <div class="shabad-container">
         <header class="page-header">
-            <h1>Shabad Mode</h1>
-            <p class="subtitle">Live kirtan detection with praman suggestions</p>
+            <h1>🎵 Kirtan Mode</h1>
+            <p class="subtitle">Live shabad detection with praman suggestions</p>
         </header>
         
         <div class="shabad-controls">
@@ -33,6 +33,47 @@
                 </svg>
                 Reset Context
             </button>
+            <div class="translation-live-toggle">
+                <label class="live-translation-label" title="Show English meaning alongside Gurbani">
+                    <input type="checkbox" id="showLiveTranslation">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 8l6 6"></path>
+                        <path d="M4 14l6-6 2-3"></path>
+                        <path d="M2 5h12"></path>
+                        <path d="M22 22l-5-10-5 10"></path>
+                        <path d="M14 18h6"></path>
+                    </svg>
+                    <span>Show Meaning</span>
+                </label>
+            </div>
+            <div class="download-controls" id="downloadControls" style="display: none;">
+                <select id="downloadFormat" class="export-select">
+                    <option value="txt">Plain Text (.txt)</option>
+                    <option value="json">JSON (.json)</option>
+                    <option value="markdown">Markdown (.md)</option>
+                </select>
+                <div class="translation-option">
+                    <label class="translation-toggle" title="Include translation in download">
+                        <input type="checkbox" id="includeTranslation" checked>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 8l6 6"></path>
+                            <path d="M4 14l6-6 2-3"></path>
+                            <path d="M2 5h12"></path>
+                            <path d="M22 22l-5-10-5 10"></path>
+                            <path d="M14 18h6"></path>
+                        </svg>
+                        <span>+ Meaning</span>
+                    </label>
+                </div>
+                <button id="downloadBtn" class="btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download
+                </button>
+            </div>
         </div>
         
         <div id="shabadStatus" class="status disconnected">

@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.name }} - User Details{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="breadcrumb">
+        <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+        <span>/</span>
+        <a href="{{ url_for('admin.users') }}">Users</a>
+        <span>/</span>
+        <span>{{ user.name }}</span>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="user-header">
+        <div class="user-header-info">
+            <h1 class="user-title">{{ user.name }}</h1>
+            <p class="user-email">{{ user.email }}</p>
+        </div>
+        <div class="user-header-actions">
+            <form method="POST" style="display: inline;">
+                <input type="hidden" name="action" value="toggle_active">
+                <button type="submit" class="btn btn-{{ 'danger' if user.is_active else 'success' }}">
+                    {{ 'Deactivate' if user.is_active else 'Activate' }}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <!-- User Info Card -->
+        <div class="detail-card">
+            <h2 class="card-title">Account Details</h2>
+            <form method="POST" class="detail-form">
+                <input type="hidden" name="action" value="update">
+                
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-input" value="{{ user.name }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" value="{{ user.email }}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select name="role" class="form-input">
+                        <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <p class="form-static">
+                            <span class="status-indicator {% if user.is_active %}active{% else %}inactive{% endif %}">
+                                {{ 'Active' if user.is_active else 'Inactive' }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Member Since</label>
+                        <p class="form-static">{{ user.created_at.strftime('%B %d, %Y') }}</p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Last Login</label>
+                    <p class="form-static">{{ user.last_login.strftime('%B %d, %Y at %H:%M') if user.last_login else 'Never' }}</p>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+
+        <!-- Quota Card -->
+        <div class="detail-card">
+            <h2 class="card-title">Usage Quota</h2>
+            
+            {% if user.quota %}
+            <div class="quota-display">
+                <div class="quota-meter">
+                    <div class="quota-bar">
+                        <div class="quota-fill" style="width: {{ user.quota.usage_percentage }}%"></div>
+                    </div>
+                    <div class="quota-labels">
+                        <span>{{ "%.1f"|format(user.quota.used_minutes) }} min used</span>
+                        <span>{{ user.quota.monthly_limit_minutes }} min limit</span>
+                    </div>
+                </div>
+
+                <div class="quota-stats">
+                    <div class="quota-stat">
+                        <span class="stat-value">{{ "%.1f"|format(user.quota.remaining_minutes) }}</span>
+                        <span class="stat-label">Minutes Remaining</span>
+                    </div>
+                    <div class="quota-stat">
+                        <span class="stat-value">{{ user.quota.reset_date.strftime('%b %d') }}</span>
+                        <span class="stat-label">Reset Date</span>
+                    </div>
+                </div>
+            </div>
+
+            <form method="POST" class="quota-form">
+                <input type="hidden" name="action" value="update">
+                <div class="form-group">
+                    <label class="form-label">Monthly Limit (minutes)</label>
+                    <input type="number" name="quota_limit" class="form-input" 
+                           value="{{ user.quota.monthly_limit_minutes }}" min="0">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-secondary">Update Limit</button>
+                    <form method="POST" style="display: inline;">
+                        <input type="hidden" name="action" value="reset_quota">
+                        <button type="submit" class="btn btn-outline">Reset Usage</button>
+                    </form>
+                </div>
+            </form>
+            {% else %}
+            <p class="no-quota">No quota configured for this user.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Transcription History -->
+    <div class="history-card">
+        <h2 class="card-title">Transcription History</h2>
+        {% if transcriptions %}
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in transcriptions %}
+                <tr>
+                    <td class="file-cell">{{ record.original_filename }}</td>
+                    <td>{{ "%.1f"|format(record.duration_seconds / 60) }} min</td>
+                    <td><span class="status-badge status-{{ record.status }}">{{ record.status }}</span></td>
+                    <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">No transcriptions yet</p>
+        {% endif %}
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="danger-zone">
+        <h2 class="danger-title">Danger Zone</h2>
+        <div class="danger-actions">
+            <div class="danger-item">
+                <div class="danger-info">
+                    <h3>Delete User</h3>
+                    <p>Permanently delete this user and all their data. This cannot be undone.</p>
+                </div>
+                <form method="POST" onsubmit="return confirm('Are you sure you want to delete this user? This action cannot be undone.');">
+                    <input type="hidden" name="action" value="delete">
+                    <button type="submit" class="btn btn-danger">Delete User</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+.breadcrumb a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    color: var(--accent-primary);
+}
+
+.breadcrumb span {
+    color: var(--text-muted);
+}
+
+.flash-messages {
+    margin-bottom: 24px;
+}
+
+.flash-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.flash-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.flash-success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+.user-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+
+.user-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-email {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.btn-secondary {
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.detail-card,
+.history-card {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.form-input:disabled {
+    opacity: 0.6;
+}
+
+.form-static {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.status-indicator::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-indicator.active::before {
+    background: #10b981;
+}
+
+.status-indicator.inactive::before {
+    background: #ef4444;
+}
+
+/* Quota Display */
+.quota-meter {
+    margin-bottom: 20px;
+}
+
+.quota-bar {
+    height: 8px;
+    background: var(--surface-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.quota-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: 4px;
+}
+
+.quota-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.quota-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.quota-stat {
+    background: var(--surface-secondary);
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.quota-stat .stat-value {
+    display: block;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.quota-stat .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+/* History Table */
+.history-card {
+    margin-bottom: 24px;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.history-table th,
+.history-table td {
+    padding: 12px 16px;
+    text-align: left;
+}
+
+.history-table th {
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.history-table td {
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.file-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.status-completed { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.status-processing { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.status-failed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.status-pending { background: var(--surface-secondary); color: var(--text-secondary); }
+
+.empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-secondary);
+}
+
+/* Danger Zone */
+.danger-zone {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.danger-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ef4444;
+    margin-bottom: 16px;
+}
+
+.danger-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.danger-info h3 {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.danger-info p {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+</style>
+{% endblock %}
+

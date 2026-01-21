@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - Shabad Guru</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Noto+Sans+Gurmukhi:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold-primary: #d4a012;
+            --gold-light: #f0d77c;
+            --gold-dark: #9a7209;
+            --ivory: #faf6ed;
+            --ivory-dark: #e8e0cc;
+            --text-dark: #2d2a24;
+            --text-muted: #6b6459;
+            --error-red: #c53030;
+            --success-green: #2f855a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1814 0%, #2d2a24 50%, #1a1814 100%);
+            color: var(--text-dark);
+        }
+
+        .register-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+        }
+
+        .register-card {
+            background: var(--ivory);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                        0 0 0 1px rgba(212, 160, 18, 0.1);
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .logo-img {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 12px;
+        }
+
+        .logo-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .welcome-text {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .welcome-heading {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .welcome-email {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .welcome-email strong {
+            color: var(--gold-dark);
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .flash-message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .flash-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: var(--error-red);
+        }
+
+        .flash-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: var(--success-green);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            border: 2px solid var(--ivory-dark);
+            border-radius: 8px;
+            background: white;
+            color: var(--text-dark);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--gold-primary);
+            box-shadow: 0 0 0 3px rgba(212, 160, 18, 0.15);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-input:disabled {
+            background: var(--ivory-dark);
+            cursor: not-allowed;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: inherit;
+            background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(212, 160, 18, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .login-link a {
+            color: var(--gold-dark);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        .quota-info {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--success-green);
+        }
+
+        .quota-info strong {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-card">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='logo.svg') }}" alt="Shabad Guru" class="logo-img">
+                <h1 class="logo-title">Shabad Guru</h1>
+            </div>
+
+            <div class="welcome-text">
+                <h2 class="welcome-heading">Create Your Account</h2>
+                <p class="welcome-email">
+                    You've been invited to join as <strong>{{ invitation.email }}</strong>
+                </p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash-message flash-{{ category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="quota-info">
+                Your account includes <strong>{{ invitation.default_quota_minutes }} minutes</strong> of transcription per month.
+            </div>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-input" 
+                           value="{{ invitation.email }}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label for="name" class="form-label">Your Name</label>
+                    <input type="text" id="name" name="name" class="form-input" 
+                           placeholder="Enter your full name" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" 
+                           placeholder="Create a password" required minlength="8">
+                    <p class="form-hint">Must be at least 8 characters</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password" class="form-label">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input" 
+                           placeholder="Confirm your password" required minlength="8">
+                </div>
+
+                <button type="submit" class="submit-btn">Create Account</button>
+            </form>
+
+            <p class="login-link">
+                Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

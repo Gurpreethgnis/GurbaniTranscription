@@ -31,6 +31,7 @@ class LiveTranscriptionClient {
         // Button handlers
         document.getElementById('startBtn').addEventListener('click', () => this.startRecording());
         document.getElementById('stopBtn').addEventListener('click', () => this.stopRecording());
+        document.getElementById('downloadBtn').addEventListener('click', () => this.downloadTranscription());
         
         // Output toggle
         document.querySelectorAll('.toggle-btn').forEach(btn => {
@@ -41,6 +42,15 @@ class LiveTranscriptionClient {
                 this.updateDisplay();
             });
         });
+        
+        // Translation toggle - enable/disable language select
+        const includeTranslation = document.getElementById('includeTranslation');
+        const targetLanguage = document.getElementById('targetLanguage');
+        if (includeTranslation && targetLanguage) {
+            includeTranslation.addEventListener('change', (e) => {
+                targetLanguage.disabled = !e.target.checked;
+            });
+        }
     }
     
     initializeSocket() {
@@ -326,6 +336,9 @@ class LiveTranscriptionClient {
         
         // Auto-scroll to bottom
         transcriptArea.scrollTop = transcriptArea.scrollHeight;
+        
+        // Show download controls if we have content
+        this.updateDownloadControls();
     }
     
     updateStatus(status, message) {
@@ -356,6 +369,117 @@ class LiveTranscriptionClient {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    /**
+     * Download the transcription in the selected format
+     */
+    downloadTranscription() {
+        if (this.segments.size === 0) {
+            this.showError('No transcription to download');
+            return;
+        }
+        
+        const format = document.getElementById('downloadFormat').value || 'txt';
+        const sortedSegments = Array.from(this.segments.values())
+            .sort((a, b) => a.start - b.start);
+        
+        let content = '';
+        let filename = `live_transcription_${new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')}`
+        let mimeType = 'text/plain';
+        
+        if (format === 'json') {
+            // JSON format with full segment data
+            const exportData = {
+                type: 'live_transcription',
+                created_at: new Date().toISOString(),
+                total_segments: sortedSegments.length,
+                segments: sortedSegments.map(seg => ({
+                    start: seg.start,
+                    end: seg.end,
+                    gurmukhi: seg.verified?.gurmukhi || seg.draft?.gurmukhi || '',
+                    roman: seg.verified?.roman || seg.draft?.roman || '',
+                    confidence: seg.verified?.confidence || seg.draft?.confidence || 0,
+                    is_verified: !!seg.verified,
+                    quote_match: seg.verified?.quote_match || null
+                }))
+            };
+            content = JSON.stringify(exportData, null, 2);
+            filename += '.json';
+            mimeType = 'application/json';
+            
+        } else if (format === 'markdown') {
+            // Markdown format
+            content = `# Live Transcription\n\n`;
+            content += `*Generated: ${new Date().toLocaleString()}*\n\n`;
+            content += `---\n\n`;
+            
+            for (const seg of sortedSegments) {
+                const gurmukhi = seg.verified?.gurmukhi || seg.draft?.gurmukhi || '';
+                const roman = seg.verified?.roman || seg.draft?.roman || '';
+                const hasQuote = seg.verified?.quote_match;
+                
+                content += `**[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s]**\n\n`;
+                content += `${gurmukhi}\n`;
+                if (roman) {
+                    content += `*${roman}*\n`;
+                }
+                if (hasQuote) {
+                    const quote = seg.verified.quote_match;
+                    content += `\n> 📖 **Scripture Quote**: ${quote.source} | Ang: ${quote.ang || 'N/A'}\n`;
+                }
+                content += `\n---\n\n`;
+            }
+            filename += '.md';
+            mimeType = 'text/markdown';
+            
+        } else {
+            // Plain text format
+            content = `Live Transcription\n`;
+            content += `Generated: ${new Date().toLocaleString()}\n`;
+            content += `${'='.repeat(50)}\n\n`;
+            
+            for (const seg of sortedSegments) {
+                const gurmukhi = seg.verified?.gurmukhi || seg.draft?.gurmukhi || '';
+                const roman = seg.verified?.roman || seg.draft?.roman || '';
+                const hasQuote = seg.verified?.quote_match;
+                
+                content += `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s]\n`;
+                content += `${gurmukhi}\n`;
+                if (roman) {
+                    content += `(${roman})\n`;
+                }
+                if (hasQuote) {
+                    const quote = seg.verified.quote_match;
+                    content += `  → Scripture Quote: ${quote.source} | Ang: ${quote.ang || 'N/A'}\n`;
+                }
+                content += `\n`;
+            }
+            filename += '.txt';
+        }
+        
+        // Create and trigger download
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log(`Downloaded transcription as ${format}`);
+    }
+    
+    /**
+     * Show/hide download controls based on whether there's content
+     */
+    updateDownloadControls() {
+        const downloadControls = document.getElementById('downloadControls');
+        if (downloadControls) {
+            downloadControls.style.display = this.segments.size > 0 ? 'flex' : 'none';
+        }
     }
 }
 

@@ -688,3 +688,115 @@ class SGGSDatabase:
         except Exception as e:
             logger.debug(f"Failed to convert row to ScriptureLine: {e}")
             return None
+    
+    def get_english_translation(self, line_id: str) -> Optional[str]:
+        """
+        Get English translation for a specific line.
+        
+        ShabadOS database may have translations in a separate table.
+        Common table names: translations, line_translations, english
+        
+        Args:
+            line_id: Line identifier
+        
+        Returns:
+            English translation string, or None if not found
+        """
+        self._ensure_connection()
+        
+        if not line_id:
+            return None
+        
+        table_names = self._get_table_names()
+        
+        # Try to find translations table
+        translations_table = None
+        for name in ['translations', 'line_translations', 'english', 'translation']:
+            if name in table_names:
+                translations_table = name
+                break
+        
+        if translations_table:
+            try:
+                # Get column info
+                cursor = self._connection.execute(f"PRAGMA table_info({translations_table})")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                # Find the translation column
+                translation_col = None
+                for col in ['translation', 'english', 'text', 'english_translation']:
+                    if col in columns:
+                        translation_col = col
+                        break
+                
+                if not translation_col:
+                    logger.debug(f"Could not find translation column in {translations_table}")
+                    return None
+                
+                # Find the line_id column
+                line_id_col = None
+                for col in ['line_id', 'id', 'gurbani_line_id']:
+                    if col in columns:
+                        line_id_col = col
+                        break
+                
+                if not line_id_col:
+                    logger.debug(f"Could not find line_id column in {translations_table}")
+                    return None
+                
+                # Check if there's a language filter column
+                language_filter = ""
+                if 'language_id' in columns:
+                    # English is typically language_id = 1 or 2 in ShabadOS
+                    language_filter = " AND (language_id = 1 OR language_id = 2)"
+                elif 'language' in columns:
+                    language_filter = " AND (language = 'english' OR language = 'en')"
+                
+                query = f"""
+                    SELECT {translation_col}
+                    FROM {translations_table}
+                    WHERE {line_id_col} = ?{language_filter}
+                    LIMIT 1
+                """
+                
+                cursor = self._connection.execute(query, (line_id,))
+                row = cursor.fetchone()
+                
+                if row and row[0]:
+                    return str(row[0]).strip()
+                
+            except sqlite3.Error as e:
+                logger.debug(f"Error getting translation from {translations_table}: {e}")
+        
+        # Fallback: check if lines table has direct translation column
+        lines_table = None
+        for name in ['lines', 'gurbani_lines']:
+            if name in table_names:
+                lines_table = name
+                break
+        
+        if lines_table:
+            try:
+                cursor = self._connection.execute(f"PRAGMA table_info({lines_table})")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                translation_col = None
+                for col in ['english', 'translation', 'english_translation']:
+                    if col in columns:
+                        translation_col = col
+                        break
+                
+                if translation_col:
+                    cursor = self._connection.execute(
+                        f"SELECT {translation_col} FROM {lines_table} WHERE id = ?",
+                        (line_id,)
+                    )
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        return str(row[0]).strip()
+                        
+            except sqlite3.Error as e:
+                logger.debug(f"Error getting translation from {lines_table}: {e}")
+        
+        logger.debug(f"No English translation found for line_id: {line_id}")
+        return None

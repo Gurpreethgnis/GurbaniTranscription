@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}All Transcriptions - Shabad Guru{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1 class="admin-title">All Transcriptions</h1>
+        <p class="admin-subtitle">View transcription history across all users</p>
+    </div>
+
+    <div class="transcriptions-card">
+        {% if records.items %}
+        <table class="transcriptions-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>User</th>
+                    <th>Duration</th>
+                    <th>Segments</th>
+                    <th>Quotes</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records.items %}
+                <tr>
+                    <td class="file-cell">
+                        <span class="filename" title="{{ record.original_filename }}">
+                            {{ record.original_filename[:40] }}{% if record.original_filename|length > 40 %}...{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if record.user %}
+                        <a href="{{ url_for('admin.user_detail', user_id=record.user.id) }}" class="user-link">
+                            {{ record.user.name }}
+                        </a>
+                        {% else %}
+                        <span class="unknown">Unknown</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ "%.1f"|format(record.duration_seconds / 60) }} min</td>
+                    <td>{{ record.segments_count or '-' }}</td>
+                    <td>{{ record.quotes_detected or '-' }}</td>
+                    <td><span class="status-badge status-{{ record.status }}">{{ record.status }}</span></td>
+                    <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        {% if records.pages > 1 %}
+        <div class="pagination">
+            {% if records.has_prev %}
+            <a href="{{ url_for('admin.transcriptions', page=records.prev_num) }}" class="page-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Previous
+            </a>
+            {% endif %}
+            
+            <div class="page-info">
+                Page {{ records.page }} of {{ records.pages }}
+            </div>
+            
+            {% if records.has_next %}
+            <a href="{{ url_for('admin.transcriptions', page=records.next_num) }}" class="page-link">
+                Next
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <h3>No Transcriptions Yet</h3>
+            <p>Transcriptions will appear here once users start processing audio files.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.admin-header {
+    margin-bottom: 32px;
+}
+
+.admin-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.admin-subtitle {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.transcriptions-card {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.transcriptions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.transcriptions-table th,
+.transcriptions-table td {
+    padding: 14px 16px;
+    text-align: left;
+}
+
+.transcriptions-table th {
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.transcriptions-table td {
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.transcriptions-table tr:last-child td {
+    border-bottom: none;
+}
+
+.file-cell .filename {
+    font-weight: 500;
+}
+
+.user-link {
+    color: var(--accent-primary);
+    text-decoration: none;
+}
+
+.user-link:hover {
+    text-decoration: underline;
+}
+
+.unknown {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.status-completed {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.status-processing {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.status-failed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.status-pending {
+    background: var(--surface-secondary);
+    color: var(--text-secondary);
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-primary);
+}
+
+.page-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    font-size: 14px;
+    color: var(--accent-primary);
+    text-decoration: none;
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.page-link:hover {
+    background: var(--surface-secondary);
+}
+
+.page-info {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-state svg {
+    margin-bottom: 16px;
+    opacity: 0.4;
+}
+
+.empty-state h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.empty-state p {
+    font-size: 14px;
+}
+</style>
+{% endblock %}
+

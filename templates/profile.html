@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Shabad Guru{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title">Your Profile</h1>
+        <p class="page-subtitle">Manage your account settings and view usage</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="profile-grid">
+        <!-- Account Info -->
+        <div class="profile-card">
+            <h2 class="card-title">Account Information</h2>
+            <form method="POST" class="profile-form">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" id="email" class="form-input" 
+                           value="{{ current_user.email }}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label for="name" class="form-label">Name</label>
+                    <input type="text" id="name" name="name" class="form-input" 
+                           value="{{ current_user.name }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Member Since</label>
+                    <p class="form-static">{{ current_user.created_at.strftime('%B %d, %Y') }}</p>
+                </div>
+
+                <h3 class="section-title">Change Password</h3>
+                <p class="section-hint">Leave blank to keep current password</p>
+
+                <div class="form-group">
+                    <label for="current_password" class="form-label">Current Password</label>
+                    <input type="password" id="current_password" name="current_password" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="new_password" class="form-label">New Password</label>
+                    <input type="password" id="new_password" name="new_password" class="form-input" minlength="8">
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input" minlength="8">
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+
+        <!-- Usage Stats -->
+        <div class="profile-card">
+            <h2 class="card-title">Usage This Month</h2>
+            
+            {% if quota %}
+            <div class="usage-stats">
+                <div class="usage-meter">
+                    <div class="usage-bar">
+                        <div class="usage-fill" style="width: {{ quota.usage_percentage }}%"></div>
+                    </div>
+                    <div class="usage-labels">
+                        <span>{{ "%.1f"|format(quota.used_minutes) }} min used</span>
+                        <span>{{ quota.monthly_limit_minutes }} min limit</span>
+                    </div>
+                </div>
+
+                <div class="usage-details">
+                    <div class="usage-item">
+                        <span class="usage-label">Remaining</span>
+                        <span class="usage-value">{{ "%.1f"|format(quota.remaining_minutes) }} minutes</span>
+                    </div>
+                    <div class="usage-item">
+                        <span class="usage-label">Resets On</span>
+                        <span class="usage-value">{{ quota.reset_date.strftime('%B %d, %Y') }}</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="no-quota">No usage quota set for your account.</p>
+            {% endif %}
+
+            <h3 class="section-title">Recent Transcriptions</h3>
+            {% if recent_transcriptions %}
+            <div class="recent-list">
+                {% for record in recent_transcriptions %}
+                <div class="recent-item">
+                    <div class="recent-info">
+                        <span class="recent-filename">{{ record.original_filename }}</span>
+                        <span class="recent-date">{{ record.created_at.strftime('%b %d, %H:%M') }}</span>
+                    </div>
+                    <span class="recent-status status-{{ record.status }}">{{ record.status }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="no-transcriptions">No transcriptions yet. <a href="{{ url_for('index') }}">Start transcribing!</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.page-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.page-subtitle {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.flash-messages {
+    margin-bottom: 24px;
+}
+
+.flash-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.flash-error {
+    background: rgba(197, 48, 48, 0.1);
+    border: 1px solid rgba(197, 48, 48, 0.3);
+    color: #c53030;
+}
+
+.flash-success {
+    background: rgba(47, 133, 90, 0.1);
+    border: 1px solid rgba(47, 133, 90, 0.3);
+    color: #2f855a;
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 768px) {
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.profile-card {
+    background: var(--surface-primary);
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid var(--border-primary);
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 24px;
+    margin-bottom: 8px;
+}
+
+.section-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.form-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.form-static {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-dark);
+}
+
+/* Usage Stats */
+.usage-meter {
+    margin-bottom: 20px;
+}
+
+.usage-bar {
+    height: 8px;
+    background: var(--surface-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.usage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-dark));
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.usage-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.usage-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.usage-item {
+    background: var(--surface-secondary);
+    padding: 12px;
+    border-radius: 8px;
+}
+
+.usage-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.usage-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Recent Transcriptions */
+.recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.recent-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--surface-secondary);
+    border-radius: 6px;
+}
+
+.recent-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.recent-filename {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-date {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.recent-status {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: capitalize;
+}
+
+.status-completed {
+    background: rgba(47, 133, 90, 0.1);
+    color: #2f855a;
+}
+
+.status-processing {
+    background: rgba(212, 160, 18, 0.1);
+    color: #9a7209;
+}
+
+.status-failed {
+    background: rgba(197, 48, 48, 0.1);
+    color: #c53030;
+}
+
+.status-pending {
+    background: var(--surface-secondary);
+    color: var(--text-secondary);
+}
+
+.no-quota, .no-transcriptions {
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 20px;
+}
+
+.no-transcriptions a {
+    color: var(--accent-primary);
+    text-decoration: none;
+}
+
+.no-transcriptions a:hover {
+    text-decoration: underline;
+}
+</style>
+{% endblock %}
+

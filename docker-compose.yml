@@ -1,23 +1,30 @@
 services:
-  transcription-app:
+  shabad-guru:
     build: .
-    container_name: katha-transcription
+    container_name: shabad-guru
     ports:
       - "5000:5000"
     volumes:
-      # Persist uploads, outputs, and logs
+      # Persist uploads, outputs, logs, and database
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
       - ./logs:/app/logs
-      # Mount templates and static for live reload
+      - ./data:/app/data
+      # Mount templates and static for live reload (dev only)
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
       # Cache Whisper models (faster-whisper uses HuggingFace cache)
-      # Mount entire .cache directory to persist all caches (HuggingFace, pip, etc.)
       - whisper-cache:/root/.cache
     environment:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
+      # Generate a secure secret key for production!
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-change-this-in-production}
+      # Admin credentials (change in production!)
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@shabadguru.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+      # Database
+      - DATABASE_URL=sqlite:////app/data/shabad_guru.db
     restart: unless-stopped
     # Enable GPU access
     deploy:
@@ -31,7 +38,7 @@ services:
           memory: 4G
         limits:
           cpus: '4'
-          memory: 8G
+          memory: 16G
 
 volumes:
   whisper-cache:

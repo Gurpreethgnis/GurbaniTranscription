@@ -29,6 +29,13 @@ from core.models import (
     QuoteContent,
     DocumentSection,
     FormattedDocument,
+    
+    # Translation models
+    TranslationProvider,
+    SupportedLanguage,
+    TranslatedSegment,
+    TranslationResult,
+    TranslationLanguageStatus,
 )
 
 __all__ = [
@@ -51,5 +58,12 @@ __all__ = [
     'QuoteContent',
     'DocumentSection',
     'FormattedDocument',
+    
+    # Translation models
+    'TranslationProvider',
+    'SupportedLanguage',
+    'TranslatedSegment',
+    'TranslationResult',
+    'TranslationLanguageStatus',
 ]
 

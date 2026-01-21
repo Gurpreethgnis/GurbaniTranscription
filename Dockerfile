@@ -48,8 +48,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p uploads outputs/transcriptions outputs/json outputs/formatted logs
+# Create necessary directories with proper permissions
+RUN mkdir -p uploads outputs/transcriptions outputs/json outputs/formatted logs data \
+    && chmod -R 755 uploads outputs logs data
 
 # Expose port
 EXPOSE 5000
@@ -58,6 +59,17 @@ EXPOSE 5000
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
+
+# Default admin credentials (override in production!)
+ENV ADMIN_EMAIL=admin@shabadguru.local
+ENV ADMIN_PASSWORD=changeme123
+
+# Database location (use persistent volume in production)
+ENV DATABASE_URL=sqlite:////app/data/shabad_guru.db
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5000/status || exit 1
 
 # Run the application
 CMD ["python", "app.py"]

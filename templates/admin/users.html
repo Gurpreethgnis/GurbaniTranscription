@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Shabad Guru{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <div class="header-content">
+            <h1 class="admin-title">User Management</h1>
+            <p class="admin-subtitle">View and manage all user accounts</p>
+        </div>
+        <a href="{{ url_for('admin.invitations') }}" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Invite User
+        </a>
+    </div>
+
+    <div class="users-card">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Quota Usage</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="{% if not user.is_active %}inactive-row{% endif %}">
+                    <td>
+                        <div class="user-cell">
+                            <span class="user-name">{{ user.name }}</span>
+                            <span class="user-email">{{ user.email }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="role-badge role-{{ user.role }}">{{ user.role }}</span>
+                    </td>
+                    <td>
+                        {% if user.quota %}
+                        <div class="quota-cell">
+                            <div class="mini-progress">
+                                <div class="mini-progress-fill" style="width: {{ user.quota.usage_percentage }}%"></div>
+                            </div>
+                            <span class="quota-text">{{ "%.0f"|format(user.quota.used_minutes) }}/{{ user.quota.monthly_limit_minutes }} min</span>
+                        </div>
+                        {% else %}
+                        <span class="no-quota">No quota</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-indicator {% if user.is_active %}active{% else %}inactive{% endif %}">
+                            {{ 'Active' if user.is_active else 'Inactive' }}
+                        </span>
+                    </td>
+                    <td>{{ user.created_at.strftime('%b %d, %Y') }}</td>
+                    <td>{{ user.last_login.strftime('%b %d, %H:%M') if user.last_login else 'Never' }}</td>
+                    <td>
+                        <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="action-link">
+                            Manage
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+}
+
+.admin-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.admin-subtitle {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-dark);
+}
+
+.users-card {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.users-table th,
+.users-table td {
+    padding: 14px 16px;
+    text-align: left;
+}
+
+.users-table th {
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.users-table td {
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.users-table tr:last-child td {
+    border-bottom: none;
+}
+
+.inactive-row {
+    opacity: 0.6;
+}
+
+.user-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-name {
+    font-weight: 500;
+}
+
+.user-email {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.role-admin {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+}
+
+.role-user {
+    background: var(--surface-secondary);
+    color: var(--text-secondary);
+}
+
+.quota-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 120px;
+}
+
+.mini-progress {
+    height: 4px;
+    background: var(--surface-secondary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mini-progress-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: 2px;
+}
+
+.quota-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.no-quota {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.status-indicator::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-indicator.active::before {
+    background: #10b981;
+}
+
+.status-indicator.inactive::before {
+    background: #ef4444;
+}
+
+.action-link {
+    color: var(--accent-primary);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.action-link:hover {
+    text-decoration: underline;
+}
+</style>
+{% endblock %}
+

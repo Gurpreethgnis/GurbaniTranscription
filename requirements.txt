@@ -4,6 +4,11 @@
 flask>=3.0.0
 werkzeug>=3.0.0
 
+# Authentication & User Management
+flask-login>=0.6.3            # User session management
+flask-sqlalchemy>=3.1.0       # Database ORM
+flask-wtf>=1.2.0              # Form handling with CSRF protection
+
 # Faster Whisper (uses CTranslate2 backend - faster and more stable)
 # This works independently of the PyTorch version for inference
 faster-whisper>=1.0.0
@@ -80,3 +85,10 @@ weasyprint>=62.0               # PDF generation from HTML (or use reportlab as f
 # For Linux/Mac, you can try:
 #   pip install faiss-gpu  # May not work, conda is recommended
 #   OR: conda install -c conda-forge faiss-gpu
+
+# Translation Support
+# Uncomment providers as needed:
+# google-cloud-translate>=3.11.0  # Google Cloud Translation API
+# openai>=1.0.0                   # OpenAI GPT for context-aware translations
+# Azure Translator uses REST API directly - no additional package needed
+# LibreTranslate uses REST API directly - no additional package needed

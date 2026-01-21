@@ -3117,3 +3117,987 @@ button .spin {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================
+   TRANSLATION PAGE STYLES
+   ============================================ */
+
+/* Transcription Selection */
+.transcription-selection {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.selection-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.transcription-select {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 1rem;
+    font-family: var(--font-body);
+}
+
+.transcription-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.transcription-info {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.info-value {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+/* Language Selection */
+.language-selection {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.section-hint {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+
+.language-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.language-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--color-bg);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.language-card:hover:not(.disabled) {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+}
+
+.language-card.selected {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.language-card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.language-flag {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.language-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.language-name {
+    font-weight: 500;
+    color: var(--color-text);
+    font-size: 0.95rem;
+}
+
+.language-native {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.language-status {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.language-status.cached {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.language-status.will-translate {
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+}
+
+.language-status.unavailable {
+    background: var(--color-error-bg);
+    color: var(--color-error);
+}
+
+.language-check {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    color: var(--color-primary);
+}
+
+.language-card.selected .language-check {
+    opacity: 1;
+}
+
+.translation-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-large {
+    padding: 14px 28px;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.selected-count {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+/* Translation Progress */
+.translation-progress-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.progress-container {
+    margin-bottom: 16px;
+}
+
+.progress-text {
+    text-align: center;
+    color: var(--color-text-muted);
+    margin-top: 12px;
+}
+
+.progress-details {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+/* Translation Results */
+.translation-results-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.results-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.result-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--color-text);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.result-tab:hover {
+    border-color: var(--color-primary);
+}
+
+.result-tab.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.tab-error {
+    color: var(--color-error);
+}
+
+.results-content {
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-bottom: 20px;
+    min-height: 200px;
+}
+
+.result-header {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.result-header h3 {
+    margin-bottom: 8px;
+}
+
+.result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.result-text {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--color-text);
+}
+
+.result-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+    color: var(--color-error);
+}
+
+.result-error h3 {
+    margin-top: 12px;
+}
+
+.result-error p {
+    color: var(--color-text-muted);
+}
+
+.segments-details {
+    margin-top: 20px;
+}
+
+.segments-details summary {
+    cursor: pointer;
+    padding: 10px;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+}
+
+.segments-list {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.segment-item {
+    padding: 12px;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--color-border);
+}
+
+.segment-item.scripture {
+    border-left-color: var(--color-primary);
+}
+
+.segment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.segment-time {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.segment-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.segment-badge.cached {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.segment-badge.scripture {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.segment-source {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+    font-family: var(--font-gurmukhi);
+}
+
+.segment-translation {
+    font-size: 0.95rem;
+    color: var(--color-text);
+}
+
+/* ============================================
+   SCRIPTURE PRESERVATION STYLES
+   Critical: Gurbani/Shabad text is sacred and must NEVER be translated or modified
+   ============================================ */
+
+.scripture-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.05));
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: var(--radius-md);
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+.scripture-notice svg {
+    flex-shrink: 0;
+    color: #f59e0b;
+    margin-top: 2px;
+}
+
+.scripture-notice strong {
+    color: #f59e0b;
+}
+
+.meta-item.scripture-preserved {
+    color: var(--color-primary);
+}
+
+.meta-item.embedded-quote-count {
+    color: #8b5cf6;
+}
+
+/* Scripture segment styling - clearly differentiated from katha */
+.segment-item.scripture-segment {
+    border-left-color: var(--color-primary);
+    border-left-width: 4px;
+    background: linear-gradient(135deg, var(--color-surface), rgba(255, 193, 7, 0.03));
+}
+
+.segment-item.katha-segment {
+    border-left-color: var(--color-border);
+}
+
+.scripture-badge {
+    background: linear-gradient(135deg, var(--color-primary-light), rgba(255, 152, 0, 0.15)) !important;
+    color: var(--color-primary) !important;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.katha-badge {
+    background: var(--color-surface-hover);
+    color: var(--color-text-muted);
+}
+
+/* Preserved Gurmukhi box - the sacred, untranslated text */
+.scripture-preserved-box {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 152, 0, 0.03));
+    border: 1px solid rgba(255, 193, 7, 0.25);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin: 8px 0;
+}
+
+.scripture-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #f59e0b;
+    margin-bottom: 8px;
+}
+
+.scripture-label svg {
+    color: #f59e0b;
+}
+
+.segment-gurmukhi-preserved {
+    font-family: var(--font-gurmukhi);
+    font-size: 1.2rem;
+    line-height: 1.8;
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+.segment-transliteration {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(255, 193, 7, 0.2);
+}
+
+.translit-label {
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+
+/* Meaning box - this is the translated meaning, NOT a replacement */
+.meaning-box {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-top: 8px;
+    border-left: 3px solid var(--color-success);
+}
+
+.meaning-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-success);
+    margin-bottom: 6px;
+}
+
+.segment-meaning {
+    font-size: 0.95rem;
+    color: var(--color-text);
+    line-height: 1.6;
+}
+
+/* Source/translation labels for katha */
+.source-label,
+.translation-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--color-text-muted);
+    margin-right: 6px;
+}
+
+/* ============================================
+   KATHA WITH EMBEDDED QUOTES STYLES
+   When katha contains quoted Gurbani, the quote is NEVER translated
+   ============================================ */
+
+.segment-item.katha-with-quote-segment {
+    border-left-color: #8b5cf6;  /* Purple for mixed content */
+    border-left-width: 4px;
+    background: linear-gradient(135deg, var(--color-surface), rgba(139, 92, 246, 0.03));
+}
+
+.katha-quote-badge {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(168, 85, 247, 0.1)) !important;
+    color: #8b5cf6 !important;
+    font-weight: 600;
+}
+
+/* Embedded quote box - the sacred, untranslated Gurbani within katha */
+.embedded-quote-box {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 152, 0, 0.03));
+    border: 1px solid rgba(255, 193, 7, 0.25);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin: 10px 0;
+    position: relative;
+}
+
+.embedded-quote-box::before {
+    content: '"';
+    position: absolute;
+    top: -5px;
+    left: 10px;
+    font-size: 2.5rem;
+    color: rgba(255, 193, 7, 0.3);
+    font-family: Georgia, serif;
+    line-height: 1;
+}
+
+.embedded-quote-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #f59e0b;
+    margin-bottom: 8px;
+}
+
+.embedded-quote-label svg {
+    color: #f59e0b;
+}
+
+.quote-ref {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: rgba(255, 193, 7, 0.1);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.embedded-quote-gurmukhi {
+    font-family: var(--font-gurmukhi);
+    font-size: 1.15rem;
+    line-height: 1.8;
+    color: var(--color-text);
+    font-weight: 500;
+    padding-left: 20px;
+}
+
+.embedded-quote-translit {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    margin-top: 8px;
+    padding-top: 6px;
+    padding-left: 20px;
+    border-top: 1px dashed rgba(255, 193, 7, 0.2);
+}
+
+.embedded-quote-meaning {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    margin-top: 6px;
+    padding-left: 20px;
+    font-style: italic;
+}
+
+.meaning-label-inline {
+    font-weight: 500;
+    color: var(--color-success);
+    font-style: normal;
+    margin-right: 4px;
+}
+
+/* Katha explanation box - the translated commentary */
+.katha-explanation-box {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-top: 10px;
+    border-left: 3px solid #8b5cf6;
+}
+
+.katha-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b5cf6;
+    margin-bottom: 6px;
+}
+
+/* ============================================
+   TRANSLATION OPTIONS IN DOWNLOAD/LIVE MODES
+   ============================================ */
+
+.translation-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.translation-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    transition: all 0.2s ease;
+}
+
+.translation-toggle:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.translation-toggle:has(input:checked) {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.translation-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.translation-toggle svg {
+    width: 16px;
+    height: 16px;
+}
+
+.language-select {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.language-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Live translation toggle for Kirtan Mode */
+.translation-live-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.live-translation-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    transition: all 0.2s ease;
+}
+
+.live-translation-label:hover {
+    border-color: var(--color-success);
+    color: var(--color-text);
+}
+
+.live-translation-label:has(input:checked) {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+.live-translation-label input[type="checkbox"] {
+    display: none;
+}
+
+.live-translation-label svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Meaning display in Kirtan Mode */
+.meaning-display {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--color-border);
+}
+
+.meaning-display .meaning-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-success);
+    display: block;
+    margin-bottom: 6px;
+}
+
+.meaning-display .meaning-text {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    font-style: italic;
+}
+
+.results-actions {
+    display: flex;
+    gap: 12px;
+}
+
+/* Provider Settings */
+.provider-settings-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.provider-panel {
+    margin-top: 16px;
+}
+
+.provider-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.provider-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.provider-option input[type="radio"] {
+    margin-top: 4px;
+}
+
+.provider-option label {
+    flex: 1;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.provider-name {
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.provider-desc {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.provider-status {
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    align-self: flex-start;
+}
+
+.provider-status.available {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.provider-status.unavailable {
+    background: var(--color-error-bg);
+    color: var(--color-error);
+}
+
+/* Translation Page Responsive */
+@media (max-width: 768px) {
+    .language-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .selection-controls {
+        flex-direction: column;
+    }
+    
+    .translation-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .translation-actions .btn-large {
+        justify-content: center;
+    }
+    
+    .results-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .results-actions {
+        flex-direction: column;
+    }
+    
+    .result-meta {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+/* ============================================
+   USER MENU & ADMIN NAVIGATION
+   ============================================ */
+
+.admin-link {
+    margin-bottom: 12px;
+    border-top: 1px solid var(--sidebar-border);
+    padding-top: 12px;
+}
+
+.admin-link svg {
+    color: var(--color-accent, #8b5cf6);
+}
+
+.user-menu {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--sidebar-border);
+}
+
+.user-info-compact {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--color-surface);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.user-name-compact {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-quota {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.user-action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+}
+
+.user-action-btn:hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.user-action-btn.logout {
+    color: var(--color-error, #dc2626);
+}
+
+.user-action-btn.logout:hover {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: var(--color-error, #dc2626);
+}
+
+/* Collapsed sidebar adjustments */
+.sidebar.collapsed .user-menu,
+.sidebar.collapsed .admin-link .nav-label {
+    display: none;
+}
+
+.sidebar.collapsed .admin-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}

@@ -31,6 +31,10 @@ class ShabadModeClient {
         this.currentShabadId = null;
         this.currentFilter = 'all';
         
+        // Session history for download
+        this.sessionHistory = [];  // Array of detected lines with timestamps
+        this.pramanHistory = [];   // Array of praman suggestions shown
+        
         // Load saved preferences
         this.loadPreferences();
         
@@ -62,6 +66,27 @@ class ShabadModeClient {
         document.getElementById('startShabadBtn').addEventListener('click', () => this.startListening());
         document.getElementById('stopShabadBtn').addEventListener('click', () => this.stopListening());
         document.getElementById('resetContextBtn').addEventListener('click', () => this.resetContext());
+        document.getElementById('downloadBtn').addEventListener('click', () => this.downloadSession());
+        
+        // Live translation toggle
+        const showLiveTranslation = document.getElementById('showLiveTranslation');
+        if (showLiveTranslation) {
+            // Load saved preference
+            this.showMeaning = localStorage.getItem('showShabadMeaning') === 'true';
+            showLiveTranslation.checked = this.showMeaning;
+            
+            showLiveTranslation.addEventListener('change', (e) => {
+                this.showMeaning = e.target.checked;
+                localStorage.setItem('showShabadMeaning', this.showMeaning);
+                // Re-render current display if we have data
+                if (this.sessionHistory.length > 0) {
+                    const lastEntry = this.sessionHistory[this.sessionHistory.length - 1];
+                    if (lastEntry.line) {
+                        this.displayCurrentLine(lastEntry.line, false);
+                    }
+                }
+            });
+        }
         
         // Preferences toggle
         document.getElementById('preferencesToggle').addEventListener('click', () => {
@@ -255,7 +280,11 @@ class ShabadModeClient {
     resetContext() {
         this.socket.emit('shabad_reset');
         this.currentShabadId = null;
+        // Clear session history
+        this.sessionHistory = [];
+        this.pramanHistory = [];
         this.clearDisplay();
+        this.updateDownloadControls();
     }
     
     async sendAudioChunk(audioBlob) {
@@ -314,6 +343,19 @@ class ShabadModeClient {
             // Show metadata
             document.getElementById('shabadMetadata').style.display = 'flex';
             this.updateMetadata(data.matched_line, data.shabad_info);
+            
+            // Track in session history for download
+            this.sessionHistory.push({
+                timestamp: new Date().toISOString(),
+                mode: data.audio_mode,
+                is_new_shabad: data.is_new_shabad,
+                line: data.matched_line,
+                shabad_info: data.shabad_info,
+                next_line: data.next_line
+            });
+            
+            // Show download controls
+            this.updateDownloadControls();
         }
         
         // Update next line
@@ -330,10 +372,19 @@ class ShabadModeClient {
     displayCurrentLine(line, isNewShabad) {
         const container = document.getElementById('currentLineDisplay');
         
+        // Check if we should show the meaning/translation
+        const showMeaning = this.showMeaning && line.english;
+        
         const html = `
             <div class="current-line ${isNewShabad ? 'new-shabad' : ''}">
                 <p class="gurmukhi-text">${this.escapeHtml(line.gurmukhi)}</p>
                 ${line.roman ? `<p class="roman-text">${this.escapeHtml(line.roman)}</p>` : ''}
+                ${showMeaning ? `
+                    <div class="meaning-display">
+                        <span class="meaning-label">Meaning:</span>
+                        <p class="meaning-text">${this.escapeHtml(line.english)}</p>
+                    </div>
+                ` : ''}
             </div>
         `;
         
@@ -409,6 +460,16 @@ class ShabadModeClient {
         
         // Apply visibility filters
         this.updatePramanVisibility();
+        
+        // Track praman history for download
+        if (data.similar_pramans?.length > 0 || data.dissimilar_pramans?.length > 0) {
+            this.pramanHistory.push({
+                timestamp: new Date().toISOString(),
+                for_line: data.for_line || null,
+                similar_pramans: data.similar_pramans || [],
+                dissimilar_pramans: data.dissimilar_pramans || []
+            });
+        }
     }
     
     displayPramans(containerId, pramans, type) {
@@ -530,6 +591,145 @@ class ShabadModeClient {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    /**
+     * Show/hide download controls based on session history
+     */
+    updateDownloadControls() {
+        const downloadControls = document.getElementById('downloadControls');
+        if (downloadControls) {
+            downloadControls.style.display = this.sessionHistory.length > 0 ? 'flex' : 'none';
+        }
+    }
+    
+    /**
+     * Download the shabad session in selected format
+     */
+    downloadSession() {
+        if (this.sessionHistory.length === 0) {
+            this.showError('No shabad session to download');
+            return;
+        }
+        
+        const format = document.getElementById('downloadFormat').value || 'txt';
+        let content = '';
+        let filename = `shabad_session_${new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')}`;
+        let mimeType = 'text/plain';
+        
+        if (format === 'json') {
+            // Full JSON export with all data
+            const exportData = {
+                type: 'shabad_session',
+                created_at: new Date().toISOString(),
+                total_lines_detected: this.sessionHistory.length,
+                session_history: this.sessionHistory,
+                praman_history: this.pramanHistory
+            };
+            content = JSON.stringify(exportData, null, 2);
+            filename += '.json';
+            mimeType = 'application/json';
+            
+        } else if (format === 'markdown') {
+            // Markdown format
+            content = `# Shabad Session\n\n`;
+            content += `*Generated: ${new Date().toLocaleString()}*\n\n`;
+            content += `**Total Lines Detected:** ${this.sessionHistory.length}\n\n`;
+            content += `---\n\n`;
+            
+            for (const entry of this.sessionHistory) {
+                const line = entry.line;
+                if (!line) continue;
+                
+                content += `## ${entry.is_new_shabad ? '🆕 New Shabad' : '📜 Line'}\n\n`;
+                content += `**Time:** ${new Date(entry.timestamp).toLocaleTimeString()}\n\n`;
+                
+                // Gurmukhi - NEVER translated, preserved as-is
+                content += `### ੴ Gurbani (Original)\n\n`;
+                content += `> ${line.gurmukhi}\n\n`;
+                
+                if (line.roman) {
+                    content += `*${line.roman}*\n\n`;
+                }
+                
+                content += `**Ang:** ${line.ang || '—'} | **Raag:** ${line.raag || '—'} | **Author:** ${line.author || '—'}\n\n`;
+                
+                if (entry.next_line) {
+                    content += `**Next Line:** ${entry.next_line.gurmukhi}\n\n`;
+                }
+                
+                content += `---\n\n`;
+            }
+            
+            // Add praman suggestions
+            if (this.pramanHistory.length > 0) {
+                content += `\n## Related Pramans\n\n`;
+                for (const pramanEntry of this.pramanHistory) {
+                    if (pramanEntry.similar_pramans?.length > 0) {
+                        content += `### Similar Pramans\n\n`;
+                        for (const praman of pramanEntry.similar_pramans) {
+                            content += `> ${praman.gurmukhi}\n`;
+                            content += `> *${praman.source} | Ang ${praman.ang || '—'}*\n\n`;
+                        }
+                    }
+                    if (pramanEntry.dissimilar_pramans?.length > 0) {
+                        content += `### Contrasting Pramans\n\n`;
+                        for (const praman of pramanEntry.dissimilar_pramans) {
+                            content += `> ${praman.gurmukhi}\n`;
+                            content += `> *${praman.source} | Ang ${praman.ang || '—'}*\n\n`;
+                        }
+                    }
+                }
+            }
+            
+            filename += '.md';
+            mimeType = 'text/markdown';
+            
+        } else {
+            // Plain text format
+            content = `Shabad Session\n`;
+            content += `Generated: ${new Date().toLocaleString()}\n`;
+            content += `Total Lines Detected: ${this.sessionHistory.length}\n`;
+            content += `${'='.repeat(60)}\n\n`;
+            
+            for (const entry of this.sessionHistory) {
+                const line = entry.line;
+                if (!line) continue;
+                
+                content += `${entry.is_new_shabad ? '[NEW SHABAD]' : '[LINE]'} ${new Date(entry.timestamp).toLocaleTimeString()}\n`;
+                content += `${'─'.repeat(40)}\n`;
+                
+                // Gurmukhi - NEVER translated, preserved as-is
+                content += `ੴ ${line.gurmukhi}\n`;
+                
+                if (line.roman) {
+                    content += `   (${line.roman})\n`;
+                }
+                
+                content += `   Ang: ${line.ang || '—'} | Raag: ${line.raag || '—'} | Author: ${line.author || '—'}\n`;
+                
+                if (entry.next_line) {
+                    content += `   Next: ${entry.next_line.gurmukhi}\n`;
+                }
+                
+                content += `\n`;
+            }
+            
+            filename += '.txt';
+        }
+        
+        // Create and trigger download
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log(`Downloaded shabad session as ${format}`);
     }
 }
 

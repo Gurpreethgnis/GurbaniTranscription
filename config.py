@@ -280,6 +280,33 @@ SHABAD_MATCH_THRESHOLD = float(os.getenv("SHABAD_MATCH_THRESHOLD", "0.70"))
 SHABAD_CONTEXT_WINDOW = int(os.getenv("SHABAD_CONTEXT_WINDOW", "5"))
 
 # ============================================
+# TRANSLATION SETTINGS
+# ============================================
+
+# Primary translation provider: google | azure | openai | libre
+TRANSLATION_PRIMARY_PROVIDER = os.getenv("TRANSLATION_PRIMARY_PROVIDER", "google")
+
+# Fallback translation provider (used when primary fails)
+TRANSLATION_FALLBACK_PROVIDER = os.getenv("TRANSLATION_FALLBACK_PROVIDER", "libre")
+
+# Translation API Keys (from environment variables)
+GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY", "")
+AZURE_TRANSLATOR_KEY = os.getenv("AZURE_TRANSLATOR_KEY", "")
+AZURE_TRANSLATOR_REGION = os.getenv("AZURE_TRANSLATOR_REGION", "global")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# LibreTranslate settings (open-source self-hosted option)
+LIBRETRANSLATE_URL = os.getenv("LIBRETRANSLATE_URL", "https://libretranslate.com")
+LIBRETRANSLATE_API_KEY = os.getenv("LIBRETRANSLATE_API_KEY", "")
+
+# Translation caching settings
+TRANSLATION_CACHE_ENABLED = os.getenv("TRANSLATION_CACHE_ENABLED", "true").lower() == "true"
+TRANSLATION_USE_SGGS_ENGLISH = os.getenv("TRANSLATION_USE_SGGS_ENGLISH", "true").lower() == "true"
+
+# Translation output directory
+TRANSLATIONS_OUTPUT_DIR = OUTPUT_DIR / "translations"
+
+# ============================================
 # DOCUMENT FORMATTING / OUTPUT
 # ============================================
 
@@ -327,6 +354,7 @@ for directory in [
     TRANSCRIPTIONS_DIR,
     JSON_DIR,
     FORMATTED_DOCS_DIR,
+    TRANSLATIONS_OUTPUT_DIR,
     LOGS_DIR,
     DATA_DIR,
     EVAL_GROUND_TRUTH_DIR,

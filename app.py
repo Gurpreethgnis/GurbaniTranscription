@@ -2,12 +2,15 @@
 Flask backend server for audio transcription application.
 
 Uses the Orchestrator pipeline for all transcription operations.
+Includes authentication, user management, and usage quotas.
 """
+import os
 import time
 import threading
 from pathlib import Path
 from typing import Optional
 from flask import Flask, request, jsonify, send_file, send_from_directory, render_template
+from flask_login import LoginManager, current_user
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import config
@@ -16,8 +19,40 @@ from audio.audio_utils import get_audio_duration
 from core.orchestrator import Orchestrator
 from ui.websocket_server import WebSocketServer
 
+# Import auth module
+from auth.models import db, User, UsageQuota, TranscriptionRecord
+from auth.routes import auth_bp, admin_bp
+from auth.decorators import login_required, admin_required, quota_required
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = config.MAX_FILE_SIZE_MB * 1024 * 1024  # Convert MB to bytes
+
+# Secret key for sessions (from environment or generate)
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
+
+# Database configuration
+db_path = os.environ.get('DATABASE_URL', f'sqlite:///{config.DATA_DIR / "shabad_guru.db"}')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_path
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
+db.init_app(app)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'warning'
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user by ID for Flask-Login."""
+    return User.query.get(int(user_id))
+
+# Register blueprints
+app.register_blueprint(auth_bp)
+app.register_blueprint(admin_bp)
 
 # Initialize services
 file_manager = FileManager()
@@ -30,6 +65,38 @@ progress_store = {}
 
 # Phase 6: Live session tracking
 live_sessions = {}  # session_id -> {start_time, chunks_processed}
+
+
+def init_database():
+    """Initialize database and create admin user if needed."""
+    with app.app_context():
+        db.create_all()
+        
+        # Check if admin user exists
+        admin_email = os.environ.get('ADMIN_EMAIL', 'admin@shabadguru.local')
+        admin = User.query.filter_by(email=admin_email).first()
+        
+        if not admin:
+            # Create admin user
+            admin_password = os.environ.get('ADMIN_PASSWORD', 'changeme123')
+            admin = User(
+                email=admin_email,
+                name='Administrator',
+                role='admin',
+                is_active=True
+            )
+            admin.set_password(admin_password)
+            db.session.add(admin)
+            db.session.flush()
+            
+            # Create quota for admin (unlimited)
+            quota = UsageQuota.create_for_user(admin.id, limit_minutes=999999)
+            db.session.add(quota)
+            
+            db.session.commit()
+            print(f"Created admin user: {admin_email}")
+            if admin_password == 'changeme123':
+                print("WARNING: Using default admin password. Set ADMIN_PASSWORD environment variable!")
 
 
 def init_orchestrator():
@@ -107,18 +174,21 @@ def init_live_orchestrator(websocket_server_instance):
 
 
 @app.route('/')
+@login_required
 def index():
     """Serve the main HTML page."""
     return render_template('index.html')
 
 
 @app.route('/live')
+@login_required
 def live():
     """Serve the live transcription page."""
     return render_template('live.html')
 
 
 @app.route('/shabad')
+@login_required
 def shabad():
     """Serve the shabad mode page (Phase 15)."""
     return render_template('shabad.html')
@@ -132,7 +202,7 @@ def static_files(filename):
 
 @app.route('/status', methods=['GET'])
 def status():
-    """Health check and status endpoint."""
+    """Health check and status endpoint (public for monitoring)."""
     orch = init_orchestrator()
     return jsonify({
         "status": "ok",
@@ -146,6 +216,7 @@ def status():
 # ============================================
 
 @app.route('/api/praman/similar', methods=['POST'])
+@login_required
 def get_similar_pramans():
     """
     Get semantically similar pramans for a given Gurmukhi text.
@@ -204,6 +275,7 @@ def get_similar_pramans():
 
 
 @app.route('/api/praman/dissimilar', methods=['POST'])
+@login_required
 def get_dissimilar_pramans():
     """
     Get thematically contrasting pramans for a given Gurmukhi text.
@@ -262,6 +334,7 @@ def get_dissimilar_pramans():
 
 
 @app.route('/api/praman/search', methods=['POST'])
+@login_required
 def search_pramans():
     """
     Search for both similar and dissimilar pramans.
@@ -343,6 +416,8 @@ def search_pramans():
 
 
 @app.route('/upload', methods=['POST'])
+@login_required
+@quota_required
 def upload_file():
     """Upload audio file to server."""
     if 'file' not in request.files:
@@ -389,6 +464,8 @@ def upload_file():
 
 
 @app.route('/transcribe', methods=['POST'])
+@login_required
+@quota_required
 def transcribe_file():
     """
     Transcribe a single audio file.
@@ -401,6 +478,8 @@ def transcribe_file():
 
 
 @app.route('/transcribe-v2', methods=['POST'])
+@login_required
+@quota_required
 def transcribe_file_v2():
     """Transcribe a single audio file using the orchestrator pipeline."""
     data = request.get_json()
@@ -413,6 +492,21 @@ def transcribe_file_v2():
     
     if not file_path.exists():
         return jsonify({"error": "File not found"}), 404
+    
+    # Get audio duration early for quota check
+    audio_duration = get_audio_duration(file_path)
+    duration_minutes = audio_duration / 60.0 if audio_duration else 0
+    
+    # Check if user has enough quota for this file
+    if current_user.quota:
+        current_user.quota.check_and_reset()
+        if not current_user.quota.can_transcribe(duration_minutes):
+            return jsonify({
+                "error": "Insufficient quota",
+                "message": f"This file is {duration_minutes:.1f} minutes but you only have {current_user.quota.remaining_minutes:.1f} minutes remaining.",
+                "remaining_minutes": current_user.quota.remaining_minutes,
+                "required_minutes": duration_minutes
+            }), 429
     
     # Initialize orchestrator if needed
     try:
@@ -428,6 +522,17 @@ def transcribe_file_v2():
         traceback.print_exc()
         return jsonify({"error": error_msg}), 500
     
+    # Create transcription record for tracking
+    transcription_record = TranscriptionRecord(
+        user_id=current_user.id,
+        filename=filename,
+        original_filename=data.get('original_filename', filename),
+        duration_seconds=audio_duration or 0,
+        status='processing'
+    )
+    db.session.add(transcription_record)
+    db.session.commit()
+    
     try:
         # Check if already processed
         file_hash = file_manager.get_file_hash(file_path)
@@ -442,6 +547,16 @@ def transcribe_file_v2():
                     existing_data = json_lib.load(f)
                     # Check if it's orchestrator format
                     if "segments" in existing_data.get("metadata", {}):
+                        # Mark record as completed (cached result)
+                        transcription_record.mark_completed(
+                            output_txt=str(text_path),
+                            output_json=str(json_path)
+                        )
+                        # Still count usage for cached results
+                        if current_user.quota and duration_minutes > 0:
+                            current_user.quota.add_usage(duration_minutes)
+                        db.session.commit()
+                        
                         return jsonify({
                             "status": "success",
                             "message": "File already processed",
@@ -449,9 +564,6 @@ def transcribe_file_v2():
                             "text_file": str(text_path),
                             "json_file": str(json_path)
                         })
-        
-        # Get audio duration for progress estimation
-        audio_duration = get_audio_duration(file_path)
         start_time = time.time()
         
         # Progress callback
@@ -553,6 +665,21 @@ def transcribe_file_v2():
             model_used=f"{config.WHISPER_MODEL_SIZE} (orchestrated)"
         )
         
+        # Update transcription record with completion info
+        transcription_record.mark_completed(
+            output_txt=str(text_path),
+            output_json=str(json_path),
+            segments_count=len(result.segments),
+            quotes_detected=result.metrics.get('quotes_detected', 0) if result.metrics else 0
+        )
+        
+        # Update user's usage quota
+        if current_user.quota and audio_duration:
+            duration_minutes = audio_duration / 60.0
+            current_user.quota.add_usage(duration_minutes)
+        
+        db.session.commit()
+        
         # Update progress to complete
         progress_data["progress"] = 100
         progress_data["status"] = "completed"
@@ -578,6 +705,10 @@ def transcribe_file_v2():
             file_hash=file_hash
         )
         
+        # Update transcription record with error
+        transcription_record.mark_failed(str(e))
+        db.session.commit()
+        
         # Update progress with error
         if filename in progress_store:
             progress_store[filename]["status"] = "error"
@@ -597,6 +728,8 @@ def transcribe_file_v2():
 
 
 @app.route('/transcribe-batch', methods=['POST'])
+@login_required
+@quota_required
 def transcribe_batch():
     """Transcribe multiple files in batch using the orchestrator pipeline."""
     data = request.get_json()
@@ -711,6 +844,7 @@ def transcribe_batch():
 
 
 @app.route('/progress/<filename>', methods=['GET'])
+@login_required
 def get_progress(filename):
     """Get progress for a specific file transcription."""
     if filename in progress_store:
@@ -719,6 +853,7 @@ def get_progress(filename):
 
 
 @app.route('/log', methods=['GET'])
+@login_required
 def get_log():
     """Get the processing log."""
     log_data = file_manager.load_log()
@@ -728,19 +863,75 @@ def get_log():
     })
 
 
+@app.route('/api/user/quota', methods=['GET'])
+@login_required
+def get_user_quota():
+    """Get current user's quota information."""
+    quota = current_user.quota
+    if quota:
+        quota.check_and_reset()
+        return jsonify({
+            "has_quota": True,
+            "monthly_limit_minutes": quota.monthly_limit_minutes,
+            "used_minutes": quota.used_minutes,
+            "remaining_minutes": quota.remaining_minutes,
+            "usage_percentage": quota.usage_percentage,
+            "reset_date": quota.reset_date.isoformat()
+        })
+    return jsonify({
+        "has_quota": False,
+        "message": "No quota configured"
+    })
+
+
+@app.route('/api/user/history', methods=['GET'])
+@login_required
+def get_user_history():
+    """Get current user's transcription history."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    records = current_user.transcriptions.order_by(
+        TranscriptionRecord.created_at.desc()
+    ).paginate(page=page, per_page=per_page, error_out=False)
+    
+    return jsonify({
+        "transcriptions": [
+            {
+                "id": r.id,
+                "filename": r.filename,
+                "original_filename": r.original_filename,
+                "duration_minutes": r.duration_minutes,
+                "status": r.status,
+                "created_at": r.created_at.isoformat(),
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "segments_count": r.segments_count,
+                "quotes_detected": r.quotes_detected
+            }
+            for r in records.items
+        ],
+        "total": records.total,
+        "pages": records.pages,
+        "current_page": records.page
+    })
+
+
 @app.route('/history')
+@login_required
 def history():
     """History page showing all processed transcriptions."""
     return render_template('history.html')
 
 
 @app.route('/settings')
+@login_required
 def settings():
     """Settings page for ASR provider configuration."""
     return render_template('settings.html')
 
 
 @app.route('/api/providers', methods=['GET'])
+@login_required
 def get_providers():
     """Get available ASR providers and their capabilities."""
     from asr.provider_registry import get_registry
@@ -752,6 +943,7 @@ def get_providers():
 
 
 @app.route('/api/settings', methods=['GET'])
+@login_required
 def get_settings():
     """Get current settings."""
     import json as json_lib
@@ -812,6 +1004,7 @@ def get_settings():
 
 
 @app.route('/api/settings', methods=['POST'])
+@login_required
 def save_settings():
     """Save settings to file."""
     import json as json_lib
@@ -864,6 +1057,7 @@ def save_settings():
 
 
 @app.route('/api/domain-settings', methods=['GET'])
+@login_required
 def get_domain_settings():
     """Get current domain language prioritization settings."""
     orch = init_orchestrator()
@@ -879,6 +1073,7 @@ def get_domain_settings():
 
 
 @app.route('/api/domain-settings', methods=['POST'])
+@login_required
 def set_domain_settings():
     """Update domain language prioritization settings."""
     data = request.get_json()
@@ -904,6 +1099,7 @@ def set_domain_settings():
 
 
 @app.route('/api/test-commercial', methods=['POST'])
+@login_required
 def test_commercial_api():
     """Test commercial API connection."""
     data = request.get_json()
@@ -938,7 +1134,278 @@ def test_commercial_api():
         })
 
 
+# ============================================
+# TRANSLATION API ENDPOINTS
+# ============================================
+
+@app.route('/translate')
+@login_required
+def translate_page():
+    """Serve the translation page."""
+    return render_template('translate.html')
+
+
+@app.route('/api/translation-languages', methods=['GET'])
+@login_required
+def get_translation_languages():
+    """
+    Get available translation languages.
+    
+    Query params:
+        filename: Optional - check cache status for a specific transcription
+    """
+    try:
+        from services.translation_service import get_translation_service
+        
+        service = get_translation_service()
+        languages = service.get_supported_languages()
+        
+        filename = request.args.get('filename')
+        
+        if filename:
+            # Get cache status for this transcription
+            text_path, json_path = file_manager.get_output_paths(filename)
+            if json_path and json_path.exists():
+                import json as json_lib
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    saved_data = json_lib.load(f)
+                
+                # Reconstruct segments for status check
+                from models import ProcessedSegment
+                segments_data = saved_data.get("metadata", {}).get("segments", [])
+                segments = [ProcessedSegment(**seg) for seg in segments_data]
+                
+                # Detect source language
+                source_lang = "pa"  # Default to Punjabi
+                if segments:
+                    # Check if primarily English
+                    english_count = sum(1 for s in segments if s.route == "english_speech")
+                    if english_count > len(segments) / 2:
+                        source_lang = "en"
+                
+                # Get language status with cache info
+                statuses = service.get_language_status_for_transcription(segments, source_lang)
+                
+                return jsonify({
+                    "languages": [lang.to_dict() for lang in languages],
+                    "language_statuses": [status.to_dict() for status in statuses],
+                    "source_language": source_lang
+                })
+        
+        return jsonify({
+            "languages": [lang.to_dict() for lang in languages]
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error getting translation languages: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/translation-providers', methods=['GET'])
+@login_required
+def get_translation_providers():
+    """Get available translation providers and their status."""
+    try:
+        from services.translation_service import get_translation_service
+        
+        service = get_translation_service()
+        providers = service.get_available_providers()
+        
+        return jsonify({
+            "providers": providers,
+            "primary": config.TRANSLATION_PRIMARY_PROVIDER,
+            "fallback": config.TRANSLATION_FALLBACK_PROVIDER
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error getting translation providers: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/translate', methods=['POST'])
+@login_required
+def translate_transcription():
+    """
+    Translate a transcription to one or more target languages.
+    
+    Request JSON:
+    {
+        "filename": "audio_file.mp3",
+        "target_languages": ["en", "hi", "es"],
+        "provider": "auto"  // Optional: "auto", "google", "azure", "openai", "libre"
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        filename = data.get("filename")
+        target_languages = data.get("target_languages", [])
+        provider = data.get("provider", "auto")
+        
+        if not filename:
+            return jsonify({"error": "filename is required"}), 400
+        
+        if not target_languages:
+            return jsonify({"error": "target_languages is required"}), 400
+        
+        # Load transcription
+        text_path, json_path = file_manager.get_output_paths(filename)
+        if not json_path or not json_path.exists():
+            return jsonify({"error": f"Transcription not found for {filename}"}), 404
+        
+        import json as json_lib
+        with open(json_path, 'r', encoding='utf-8') as f:
+            saved_data = json_lib.load(f)
+        
+        # Reconstruct segments
+        from models import ProcessedSegment
+        segments_data = saved_data.get("metadata", {}).get("segments", [])
+        
+        if not segments_data:
+            # Try old format
+            transcription_text = saved_data.get("transcription", "")
+            if isinstance(transcription_text, dict):
+                transcription_text = transcription_text.get("gurmukhi", "") or transcription_text.get("roman", "")
+            segments_data = [{
+                "segment_id": "seg_0",
+                "text": transcription_text,
+                "start": 0.0,
+                "end": 0.0,
+                "route": "punjabi_speech",
+                "type": "speech",
+                "language": "pa",
+                "confidence": 0.8
+            }]
+        
+        segments = []
+        for seg_data in segments_data:
+            try:
+                segments.append(ProcessedSegment(**seg_data))
+            except Exception as seg_error:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to parse segment: {seg_error}")
+                continue
+        
+        if not segments:
+            return jsonify({"error": "No valid segments found in transcription"}), 400
+        
+        # Detect source language
+        source_lang = "pa"  # Default to Punjabi
+        english_count = sum(1 for s in segments if s.route == "english_speech")
+        if english_count > len(segments) / 2:
+            source_lang = "en"
+        
+        # Get translation service
+        from services.translation_service import get_translation_service
+        service = get_translation_service()
+        
+        # Translate to each target language
+        results = {}
+        for target_lang in target_languages:
+            if target_lang == source_lang:
+                continue  # Skip translating to source language
+            
+            try:
+                provider_to_use = None if provider == "auto" else provider
+                
+                translation_result = service.translate_transcription(
+                    filename=filename,
+                    segments=segments,
+                    source_language=source_lang,
+                    target_language=target_lang,
+                    provider_name=provider_to_use
+                )
+                
+                results[target_lang] = translation_result.to_dict()
+                
+                # Save translation to file
+                translation_filename = f"{Path(filename).stem}_{target_lang}.json"
+                translation_path = config.TRANSLATIONS_OUTPUT_DIR / translation_filename
+                with open(translation_path, 'w', encoding='utf-8') as f:
+                    json_lib.dump(translation_result.to_dict(), f, ensure_ascii=False, indent=2)
+                
+            except Exception as lang_error:
+                import logging
+                logging.getLogger(__name__).error(f"Translation to {target_lang} failed: {lang_error}")
+                results[target_lang] = {
+                    "error": str(lang_error),
+                    "target_language": target_lang
+                }
+        
+        return jsonify({
+            "status": "success",
+            "source_language": source_lang,
+            "translations": results
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Translation error: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/translate-text', methods=['POST'])
+@login_required
+def translate_text():
+    """
+    Translate a single text string.
+    
+    Request JSON:
+    {
+        "text": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ",
+        "source_language": "pa",
+        "target_language": "en",
+        "provider": "auto"  // Optional
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        text = data.get("text", "")
+        source_lang = data.get("source_language", "pa")
+        target_lang = data.get("target_language", "en")
+        provider = data.get("provider", "auto")
+        context = data.get("context")  # Optional: "scripture", "katha"
+        
+        if not text:
+            return jsonify({"error": "text is required"}), 400
+        
+        from services.translation_service import get_translation_service
+        service = get_translation_service()
+        
+        provider_to_use = None if provider == "auto" else provider
+        
+        translated_text, provider_used = service.translate_text(
+            text=text,
+            source_language=source_lang,
+            target_language=target_lang,
+            context=context,
+            provider_name=provider_to_use
+        )
+        
+        return jsonify({
+            "status": "success",
+            "source_text": text,
+            "translated_text": translated_text,
+            "source_language": source_lang,
+            "target_language": target_lang,
+            "provider": provider_used.value
+        })
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Text translation error: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/download/<path:filename>')
+@login_required
 def download_file(filename):
     """Download a transcription file."""
     from urllib.parse import unquote
@@ -995,6 +1462,7 @@ def handle_not_found(e):
 
 
 @app.route('/format-document', methods=['POST'])
+@login_required
 def format_document():
     """Format a transcription result into a structured document."""
     try:
@@ -1049,6 +1517,7 @@ def format_document():
 
 
 @app.route('/export/<filename>/<format>', methods=['GET'])
+@login_required
 def export_document(filename: str, format: str):
     """
     Export formatted document in specified format.
@@ -1240,6 +1709,10 @@ def handle_server_error(e):
 
 
 if __name__ == '__main__':
+    # Initialize database and create admin user
+    print("Initializing database...")
+    init_database()
+    
     # Test GPU first if test script exists
     try:
         import test_gpu

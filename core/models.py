@@ -364,3 +364,137 @@ class FormattedDocument:
             "sections": [section.to_dict() for section in self.sections],
             "metadata": self.metadata
         }
+
+
+# Translation Models
+
+class TranslationProvider(str, Enum):
+    """Enumeration of translation providers."""
+    GOOGLE = "google"
+    AZURE = "azure"
+    OPENAI = "openai"
+    LIBRETRANSLATE = "libre"
+    CACHED = "cached"  # For pre-existing translations (e.g., SGGS database)
+
+
+@dataclass
+class SupportedLanguage:
+    """Represents a supported translation language."""
+    code: str  # ISO 639-1 code (e.g., "en", "hi", "pa")
+    name: str  # Display name (e.g., "English", "Hindi")
+    native_name: str  # Native name (e.g., "English", "हिन्दी")
+    flag_emoji: str  # Flag emoji for UI display
+    is_cached: bool = False  # Whether cached translations exist for this language
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "code": self.code,
+            "name": self.name,
+            "native_name": self.native_name,
+            "flag_emoji": self.flag_emoji,
+            "is_cached": self.is_cached
+        }
+
+
+@dataclass
+class TranslatedSegment:
+    """
+    Represents a translated segment with timing and text.
+    
+    IMPORTANT: For scripture quotes (Shabads/Gurbani), the original sacred text
+    is NEVER modified or translated. The `preserved_original` field keeps the
+    original Gurmukhi intact, while `translated_text` provides the meaning/interpretation
+    in the target language.
+    
+    For katha (explanation) segments that contain EMBEDDED scripture quotes,
+    the quoted Gurbani is preserved in `embedded_quotes` while the surrounding
+    explanation text is translated.
+    """
+    start: float  # Start timestamp in seconds
+    end: float  # End timestamp in seconds
+    source_text: str  # Original text (Gurmukhi or English)
+    source_language: str  # Source language code
+    translated_text: str  # Translated meaning (for scripture) or translated text (for katha)
+    target_language: str  # Target language code
+    provider: TranslationProvider  # Which provider was used
+    confidence: Optional[float] = None  # Translation confidence (if available)
+    is_cached: bool = False  # Whether this came from cache/database
+    is_scripture: bool = False  # Whether this is a scripture quote (Shabad/Gurbani)
+    preserved_original: Optional[str] = None  # Original Gurmukhi text preserved (NEVER translated for scripture)
+    transliteration: Optional[str] = None  # Romanized version of the original (if applicable)
+    # Embedded quotes within katha - these are NEVER translated
+    embedded_quotes: Optional[List[Dict[str, Any]]] = None  # List of {text, canonical_text, meaning, position}
+    has_embedded_quote: bool = False  # Quick flag to check if segment has embedded quotes
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        result = {
+            "start": self.start,
+            "end": self.end,
+            "source_text": self.source_text,
+            "source_language": self.source_language,
+            "translated_text": self.translated_text,
+            "target_language": self.target_language,
+            "provider": self.provider.value,
+            "is_cached": self.is_cached,
+            "is_scripture": self.is_scripture,
+            "has_embedded_quote": self.has_embedded_quote
+        }
+        if self.confidence is not None:
+            result["confidence"] = self.confidence
+        # Always include preserved_original for scripture segments
+        if self.is_scripture and self.preserved_original:
+            result["preserved_original"] = self.preserved_original
+        if self.transliteration:
+            result["transliteration"] = self.transliteration
+        # Include embedded quotes for katha segments with quoted Gurbani
+        if self.embedded_quotes:
+            result["embedded_quotes"] = self.embedded_quotes
+        return result
+
+
+@dataclass
+class TranslationResult:
+    """Complete translation result for a transcription."""
+    source_filename: str  # Original audio filename
+    source_language: str  # Primary source language (pa or en)
+    target_language: str  # Target translation language
+    segments: List[TranslatedSegment]  # Translated segments
+    full_translation: str  # Complete translated text
+    provider: TranslationProvider  # Primary provider used
+    cached_count: int  # Number of segments from cache
+    translated_count: int  # Number of segments translated via API
+    created_at: str  # ISO format timestamp
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "source_filename": self.source_filename,
+            "source_language": self.source_language,
+            "target_language": self.target_language,
+            "segments": [seg.to_dict() for seg in self.segments],
+            "full_translation": self.full_translation,
+            "provider": self.provider.value,
+            "cached_count": self.cached_count,
+            "translated_count": self.translated_count,
+            "created_at": self.created_at
+        }
+
+
+@dataclass
+class TranslationLanguageStatus:
+    """Status of a language for translation (cached vs needs API)."""
+    language: SupportedLanguage
+    status: str  # "cached", "will_translate", "unavailable"
+    cached_segments: int  # Number of segments with cached translations
+    total_segments: int  # Total segments in transcription
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "language": self.language.to_dict(),
+            "status": self.status,
+            "cached_segments": self.cached_segments,
+            "total_segments": self.total_segments
+        }

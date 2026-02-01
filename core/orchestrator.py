@@ -930,9 +930,17 @@ class Orchestrator:
             working_audio_bytes = audio_bytes
         
         try:
-            # Create temporary file from audio bytes
+            import io
+            import wave
+            
+            # Create temporary file from audio bytes (ensure it's a valid WAV for faster-whisper)
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
-                tmp_file.write(working_audio_bytes)
+                # Wrap raw pcm bytes in a WAV container (assuming 16kHz, mono, 16-bit)
+                with wave.open(tmp_file.name, 'wb') as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(16000)
+                    wav_file.writeframes(working_audio_bytes)
                 tmp_path = Path(tmp_file.name)
             
             # Create AudioChunk

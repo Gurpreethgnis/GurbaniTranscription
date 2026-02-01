@@ -210,9 +210,11 @@ class AudioDenoiser:
         """
         logger.debug(f"Denoising audio chunk: {len(audio_bytes)} bytes (backend: {self.backend})")
         
-        try:
             # Convert bytes to numpy array
             # Assume 16-bit PCM WAV format
+            # Ensure even number of bytes for int16 alignment
+            if len(audio_bytes) % 2 != 0:
+                audio_bytes = audio_bytes[:-1]
             audio_array = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
             audio_array = audio_array / 32768.0  # Normalize to [-1, 1]
             

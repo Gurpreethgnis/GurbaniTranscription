@@ -4,12 +4,15 @@ Base ASR class providing shared functionality for all ASR engines.
 This module provides the abstract base class that all ASR engines should extend,
 reducing code duplication across ASRWhisper, ASRIndic, and ASREnglish.
 """
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import config
 from core.models import AudioChunk, ASRResult, Segment
 from utils.device_utils import detect_device
+
+logger = logging.getLogger(__name__)
 
 # Try to import faster-whisper
 try:

@@ -76,7 +76,7 @@ else:
 LANGUAGE_HINTS = ["pa", "ur", "en"]  # Punjabi, Urdu, English
 
 # ASR-B: Indic-tuned model
-ASR_B_MODEL = "vasista22/whisper-hindi-large-v2"  # Indic-tuned model (HuggingFace identifier)
+ASR_B_MODEL = "large-v3"  # Use large-v3 (excellent for Indic, already cached)
 ASR_B_FALLBACK_MODEL = "large-v3"  # Fallback if Indic model unavailable
 
 # ASR-C: English-optimized model

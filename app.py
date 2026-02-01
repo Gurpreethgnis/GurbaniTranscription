@@ -1715,13 +1715,13 @@ if __name__ == '__main__':
     
     # Test GPU first if test script exists
     try:
-        import test_gpu
+        from tests import test_gpu
         print("Running GPU compatibility test...")
         gpu_ok = test_gpu.test_gpu()
         if not gpu_ok:
             print("WARNING: GPU test failed, but continuing with initialization...")
-    except ImportError:
-        print("GPU test script not found, skipping test...")
+    except (ImportError, ModuleNotFoundError):
+        print("GPU test script not found (tests/test_gpu.py), skipping test...")
     except Exception as e:
         print(f"GPU test error (continuing anyway): {e}")
     

@@ -41,9 +41,15 @@ Thumbs.db
 *.tmp
 *.log
 
+# Environment variables (credentials)
+.env
+
 # Database files (large, generated)
 data/sggs.sqlite
 data/dasam.db
+data/*.db
+shabad_guru.db
+/workspace/shabad_guru.db
 
 # Vector index files (generated)
 data/vectors/

@@ -39,6 +39,10 @@ class BaseASR(ABC):
         'mixed': None
     }
     
+    # Class-level cache to share models across engine instances
+    _model_cache: Dict[str, Any] = {}
+    _model_lock = None
+    
     def __init__(self, model_size: Optional[str] = None):
         """
         Initialize the ASR engine.
@@ -46,6 +50,10 @@ class BaseASR(ABC):
         Args:
             model_size: Whisper model size (defaults to subclass-specific default)
         """
+        import threading
+        if BaseASR._model_lock is None:
+            BaseASR._model_lock = threading.Lock()
+            
         if not WHISPER_AVAILABLE:
             raise ImportError(
                 "faster-whisper is not installed. Install with: pip install faster-whisper"
@@ -68,22 +76,35 @@ class BaseASR(ABC):
         return "int8"
     
     def _load_model(self):
-        """Load the Whisper model."""
+        """Load the Whisper model with caching support."""
         compute_type = self._get_compute_type()
         device_info = f"GPU ({self.device_name})" if self.device == "cuda" else "CPU"
         
-        print(f"Loading {self.engine_name} model: {self.model_size} on {device_info}")
+        # Create a unique cache key based on model size and compute type
+        cache_key = f"{self.model_size}_{self.device}_{compute_type}"
         
-        try:
-            self.model = WhisperModel(
-                self.model_size,
-                device=self.device,
-                compute_type=compute_type,
-                cpu_threads=4 if self.device == "cpu" else 0
-            )
-            print(f"{self.engine_name} model {self.model_size} loaded successfully on {self.device.upper()}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to load {self.engine_name} model: {str(e)}")
+        with BaseASR._model_lock:
+            # Check if model is already in cache
+            if cache_key in BaseASR._model_cache:
+                logger.debug(f"Using cached model for {self.engine_name}: {self.model_size}")
+                self.model = BaseASR._model_cache[cache_key]
+                return
+            
+            print(f"Loading {self.engine_name} model: {self.model_size} on {device_info}")
+            
+            try:
+                self.model = WhisperModel(
+                    self.model_size,
+                    device=self.device,
+                    compute_type=compute_type,
+                    cpu_threads=4 if self.device == "cpu" else 0
+                )
+                # Store in cache
+                BaseASR._model_cache[cache_key] = self.model
+                print(f"{self.engine_name} model {self.model_size} loaded successfully on {self.device.upper()}")
+            except Exception as e:
+                # If loading fails, don't cache and raise
+                raise RuntimeError(f"Failed to load {self.engine_name} model: {str(e)}")
     
     def _get_language_for_route(self, language: Optional[str], route: Optional[str]) -> Optional[str]:
         """

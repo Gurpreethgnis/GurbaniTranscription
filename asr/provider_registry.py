@@ -76,6 +76,8 @@ class ProviderRegistry:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
+            import threading
+            cls._instance._lock = threading.Lock()
         return cls._instance
     
     def __init__(self):
@@ -213,16 +215,17 @@ class ProviderRegistry:
                            f"Check dependencies or configuration.")
         
         # Return cached provider if available
-        if provider_type in self._providers and not force_reload:
-            logger.debug(f"Returning cached provider: {provider_type}")
-            return self._providers[provider_type]
-        
-        # Instantiate provider
-        logger.info(f"Instantiating provider: {provider_type}")
-        provider = self._create_provider(provider_type)
-        self._providers[provider_type] = provider
-        
-        return provider
+        with self._lock:
+            if provider_type in self._providers and not force_reload:
+                logger.debug(f"Returning cached provider: {provider_type}")
+                return self._providers[provider_type]
+            
+            # Instantiate provider
+            logger.info(f"Instantiating provider: {provider_type}")
+            provider = self._create_provider(provider_type)
+            self._providers[provider_type] = provider
+            
+            return provider
     
     def _create_provider(self, provider_type: str) -> Any:
         """

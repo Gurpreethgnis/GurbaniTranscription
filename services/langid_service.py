@@ -58,8 +58,9 @@ class LangIDService:
         if self.quick_asr_service is not None:
             try:
                 # Run a quick transcription pass for language detection
-                result = self.quick_asr_service.transcribe_file(
-                    audio_chunk.audio_path,
+                # Use transcribe_chunk to avoid excessive VAD filtering on short segments
+                result = self.quick_asr_service.transcribe_chunk(
+                    audio_chunk,
                     language=None  # Auto-detect
                 )
                 

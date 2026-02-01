@@ -59,6 +59,7 @@ file_manager = FileManager()
 orchestrator = None
 live_orchestrator = None  # Phase 6: Separate orchestrator for live mode
 websocket_server = None  # Phase 6: WebSocket server
+live_orch_lock = threading.Lock()  # Synchronize orchestrator initialization
 
 # Progress tracking for active transcriptions
 progress_store = {}
@@ -122,55 +123,56 @@ def init_live_orchestrator(websocket_server_instance):
     Phase 6: Live mode orchestrator with event callbacks.
     """
     global live_orchestrator
-    if live_orchestrator is None:
-        try:
-            print("Initializing Live Orchestrator (this may take a moment)...")
-            
-            def live_callback(event_type: str, data: dict):
-                """Callback for live mode events."""
-                if not websocket_server_instance:
-                    return
+    with live_orch_lock:
+        if live_orchestrator is None:
+            try:
+                print("Initializing Live Orchestrator (this may take a moment)...")
                 
-                session_id = data.get('session_id', 'unknown')
+                def live_callback(event_type: str, data: dict):
+                    """Callback for live mode events."""
+                    if not websocket_server_instance:
+                        return
+                    
+                    session_id = data.get('session_id', 'unknown')
+                    
+                    if event_type == 'draft':
+                        websocket_server_instance.emit_draft_caption(
+                            session_id=session_id,
+                            segment_id=data.get('segment_id', 'unknown'),
+                            start=data.get('start', 0.0),
+                            end=data.get('end', 0.0),
+                            text=data.get('text', ''),
+                            confidence=data.get('confidence', 0.0),
+                            gurmukhi=data.get('gurmukhi'),
+                            roman=data.get('roman')
+                        )
+                    elif event_type == 'verified':
+                        websocket_server_instance.emit_verified_update(
+                            session_id=session_id,
+                            segment_id=data.get('segment_id', 'unknown'),
+                            start=data.get('start', 0.0),
+                            end=data.get('end', 0.0),
+                            gurmukhi=data.get('gurmukhi', ''),
+                            roman=data.get('roman', ''),
+                            confidence=data.get('confidence', 0.0),
+                            quote_match=data.get('quote_match'),
+                            needs_review=data.get('needs_review', False)
+                        )
+                    elif event_type == 'error':
+                        websocket_server_instance.emit_error(
+                            session_id=session_id,
+                            message=data.get('message', 'Unknown error'),
+                            error_type=data.get('error_type', 'processing')
+                        )
                 
-                if event_type == 'draft':
-                    websocket_server_instance.emit_draft_caption(
-                        session_id=session_id,
-                        segment_id=data.get('segment_id', 'unknown'),
-                        start=data.get('start', 0.0),
-                        end=data.get('end', 0.0),
-                        text=data.get('text', ''),
-                        confidence=data.get('confidence', 0.0),
-                        gurmukhi=data.get('gurmukhi'),
-                        roman=data.get('roman')
-                    )
-                elif event_type == 'verified':
-                    websocket_server_instance.emit_verified_update(
-                        session_id=session_id,
-                        segment_id=data.get('segment_id', 'unknown'),
-                        start=data.get('start', 0.0),
-                        end=data.get('end', 0.0),
-                        gurmukhi=data.get('gurmukhi', ''),
-                        roman=data.get('roman', ''),
-                        confidence=data.get('confidence', 0.0),
-                        quote_match=data.get('quote_match'),
-                        needs_review=data.get('needs_review', False)
-                    )
-                elif event_type == 'error':
-                    websocket_server_instance.emit_error(
-                        session_id=session_id,
-                        message=data.get('message', 'Unknown error'),
-                        error_type=data.get('error_type', 'processing')
-                    )
-            
-            live_orchestrator = Orchestrator(live_callback=live_callback)
-            print("Live Orchestrator initialized successfully")
-        except Exception as e:
-            print(f"ERROR: Failed to initialize Live Orchestrator: {e}")
-            import traceback
-            traceback.print_exc()
-            live_orchestrator = None
-    return live_orchestrator
+                live_orchestrator = Orchestrator(live_callback=live_callback)
+                print("Live Orchestrator initialized successfully")
+            except Exception as e:
+                print(f"ERROR: Failed to initialize Live Orchestrator: {e}")
+                import traceback
+                traceback.print_exc()
+                live_orchestrator = None
+        return live_orchestrator
 
 
 @app.route('/')

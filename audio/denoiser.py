@@ -236,8 +236,8 @@ class AudioDenoiser:
             return denoised_bytes
             
         except Exception as e:
-            logger.error(f"Failed to denoise audio chunk: {e}", exc_info=True)
-            raise AudioDenoiseError(self.backend, str(e))
+            logger.warning(f"Failed to denoise audio chunk: {e}. Falling back to original.")
+            return audio_bytes
     
     def _denoise_audio(self, audio_data: np.ndarray, sample_rate: int) -> np.ndarray:
         """

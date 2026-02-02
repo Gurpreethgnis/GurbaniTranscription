@@ -94,8 +94,19 @@ def test_pipeline_components():
         print(f"  [FAIL] {e}")
         results.append(("Audio processing", False, str(e)))
     
-    # Test 5: Full orchestrator (quick test)
-    print("\n[5/5] Testing full orchestrator pipeline...")
+    # Test 5: Check for ffmpeg
+    print("\n[5/6] Testing ffmpeg installation...")
+    import subprocess
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        print("  [OK] ffmpeg is installed")
+        results.append(("ffmpeg", True, None))
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("  [FAIL] ffmpeg is not installed or not in PATH")
+        results.append(("ffmpeg", False, "ffmpeg not found"))
+
+    # Test 6: Full orchestrator (quick test)
+    print("\n[6/6] Testing full orchestrator pipeline...")
     try:
         if test_audio and test_audio.exists():
             orch = Orchestrator()

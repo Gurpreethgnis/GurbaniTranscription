@@ -1,0 +1,523 @@
+/**
+ * Live Mode Rich Text Editor Styles
+ * 
+ * Word-like editor experience with toolbar, formatting, and segment metadata tooltips.
+ */
+
+/* --------------------------------------------------------------------------
+   Live Container Layout
+   -------------------------------------------------------------------------- */
+.live-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.live-container .page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.live-container .page-header h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--color-text-primary);
+}
+
+.live-container .subtitle {
+    color: var(--color-text-muted);
+    font-size: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Controls Bar
+   -------------------------------------------------------------------------- */
+.live-container .controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.live-container .controls .btn-primary,
+.live-container .controls .btn-secondary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.live-container .controls .btn-primary {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+}
+
+.live-container .controls .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-dark, #4a7ba8);
+    transform: translateY(-1px);
+}
+
+.live-container .controls .btn-secondary {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}
+
+.live-container .controls .btn-secondary:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+}
+
+.live-container .controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Status Indicator */
+.live-container .status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    margin-left: auto;
+}
+
+.live-container .status.disconnected {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.live-container .status.connected {
+    background: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.live-container .status.recording {
+    background: rgba(255, 193, 7, 0.15);
+    color: #cc9a00;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Error Message */
+.error-message {
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    color: #dc3545;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Editor Wrapper
+   -------------------------------------------------------------------------- */
+.editor-wrapper {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar (Word-like)
+   -------------------------------------------------------------------------- */
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    flex-wrap: wrap;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--color-border);
+    margin: 0 0.5rem;
+}
+
+.toolbar-spacer {
+    flex: 1;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.toolbar-btn:active,
+.toolbar-btn.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.toolbar-select {
+    height: 32px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.toolbar-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+/* Output Toggle Buttons */
+.output-toggle .toggle-btn {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.output-toggle .toggle-btn:first-child {
+    border-radius: 4px 0 0 4px;
+}
+
+.output-toggle .toggle-btn:last-child {
+    border-radius: 0 4px 4px 0;
+}
+
+.output-toggle .toggle-btn:not(:first-child) {
+    border-left: none;
+}
+
+.output-toggle .toggle-btn.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.output-toggle .toggle-btn:hover:not(.active) {
+    background: var(--color-bg-hover);
+}
+
+/* --------------------------------------------------------------------------
+   Editor Content Area
+   -------------------------------------------------------------------------- */
+.editor-content-wrapper {
+    min-height: 400px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.editor-content {
+    min-height: 400px;
+    padding: 1.5rem;
+    font-family: 'Noto Sans Gurmukhi', 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--color-text-primary);
+    outline: none;
+}
+
+.editor-content:empty::before {
+    content: attr(placeholder);
+    color: var(--color-text-muted);
+    pointer-events: none;
+}
+
+.editor-content:focus {
+    background: var(--color-bg-primary);
+}
+
+/* Segment spans within editor */
+.editor-content .segment-text {
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
+.editor-content .segment-text:hover {
+    background: rgba(var(--color-primary-rgb, 66, 133, 244), 0.15);
+}
+
+.editor-content .segment-text.draft {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.editor-content .segment-text.verified {
+    color: var(--color-text-primary);
+}
+
+.editor-content .segment-text.quote {
+    background: rgba(255, 193, 7, 0.2);
+    border-left: 3px solid #ffc107;
+    padding-left: 8px;
+    margin-left: -8px;
+}
+
+.editor-content .segment-text.low-confidence {
+    text-decoration: underline wavy rgba(220, 53, 69, 0.5);
+}
+
+/* Roman transliteration styling */
+.editor-content .segment-roman {
+    display: block;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Status Bar (Word-like)
+   -------------------------------------------------------------------------- */
+.editor-statusbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: var(--color-bg-tertiary, var(--color-bg-secondary));
+    border-top: 1px solid var(--color-border);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.statusbar-left,
+.statusbar-right {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.statusbar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.recording-indicator {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.recording-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #dc3545;
+    border-radius: 50%;
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* --------------------------------------------------------------------------
+   Export Controls
+   -------------------------------------------------------------------------- */
+.export-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.export-select,
+.language-select {
+    height: 40px;
+    padding: 0 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+}
+
+.translation-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.translation-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    transition: all 0.2s ease;
+}
+
+.translation-toggle:hover {
+    background: var(--color-bg-hover);
+}
+
+.translation-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.translation-toggle:has(input:checked) {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Segment Metadata Tooltip
+   -------------------------------------------------------------------------- */
+.segment-tooltip {
+    position: fixed;
+    z-index: 1000;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    min-width: 220px;
+    max-width: 300px;
+    pointer-events: none;
+}
+
+.tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 8px 8px 0 0;
+}
+
+.tooltip-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--color-text-primary);
+}
+
+.tooltip-confidence {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.tooltip-confidence.high {
+    background: rgba(25, 135, 84, 0.15);
+    color: #198754;
+}
+
+.tooltip-confidence.medium {
+    background: rgba(255, 193, 7, 0.15);
+    color: #cc9a00;
+}
+
+.tooltip-confidence.low {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+}
+
+.tooltip-content {
+    padding: 0.75rem 1rem;
+}
+
+.tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.tooltip-row:last-child {
+    margin-bottom: 0;
+}
+
+.tooltip-label {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+.tooltip-value {
+    font-size: 0.8rem;
+    color: var(--color-text-primary);
+    font-weight: 500;
+    text-align: right;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Design
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .live-container {
+        padding: 1rem;
+    }
+    
+    .editor-toolbar {
+        padding: 0.5rem;
+    }
+    
+    .toolbar-divider {
+        display: none;
+    }
+    
+    .output-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .export-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .export-controls button,
+    .export-controls select {
+        width: 100%;
+    }
+}

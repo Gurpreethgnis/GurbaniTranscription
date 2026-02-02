@@ -4,11 +4,15 @@
 
 {% block nav_live_active %}active{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/live-editor.css') }}">
+{% endblock %}
+
 {% block content %}
     <div class="live-container">
         <header class="page-header">
             <h1>ਕਥਾ Katha Mode</h1>
-            <p class="subtitle">Live transcription of katha with Gurbani quote detection</p>
+            <p class="subtitle">Live transcription with real-time editing</p>
         </header>
         
         <div class="controls">
@@ -25,68 +29,219 @@
                 </svg>
                 Stop Recording
             </button>
-            <div class="output-toggle">
-                <button class="toggle-btn active" data-output="gurmukhi">Gurmukhi</button>
-                <button class="toggle-btn" data-output="roman">Roman</button>
-                <button class="toggle-btn" data-output="both">Both</button>
+            <div id="status" class="status disconnected">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span id="statusText">Disconnected</span>
             </div>
-            <div class="download-controls" id="downloadControls" style="display: none;">
-                <select id="downloadFormat" class="export-select">
-                    <option value="txt">Plain Text (.txt)</option>
-                    <option value="json">JSON (.json)</option>
-                    <option value="markdown">Markdown (.md)</option>
-                </select>
-                <div class="translation-option">
-                    <label class="translation-toggle" title="Include translation in download">
-                        <input type="checkbox" id="includeTranslation">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 8l6 6"></path>
-                            <path d="M4 14l6-6 2-3"></path>
-                            <path d="M2 5h12"></path>
-                            <path d="M22 22l-5-10-5 10"></path>
-                            <path d="M14 18h6"></path>
-                        </svg>
-                        <span>Translate</span>
-                    </label>
-                    <select id="targetLanguage" class="language-select" disabled>
-                        <option value="en">English</option>
-                        <option value="hi">Hindi</option>
-                        <option value="es">Spanish</option>
-                        <option value="fr">French</option>
-                        <option value="de">German</option>
-                    </select>
-                </div>
-                <button id="downloadBtn" class="btn-secondary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download
-                </button>
-            </div>
-        </div>
-        
-        <div id="status" class="status disconnected">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            Disconnected
         </div>
         
         <div id="errorMessage" class="error-message" style="display: none;"></div>
         
-        <div class="transcript-area" id="transcriptArea">
-            <p style="color: var(--color-text-muted); text-align: center; margin-top: 50px;">
-                Click "Start Recording" to begin live transcription...
-            </p>
+        <!-- Rich Text Editor -->
+        <div class="editor-wrapper">
+            <!-- Toolbar (Word-like) -->
+            <div class="editor-toolbar" id="editorToolbar">
+                <div class="toolbar-group">
+                    <button type="button" class="toolbar-btn" data-command="undo" title="Undo (Ctrl+Z)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 7v6h6"></path>
+                            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                        </svg>
+                    </button>
+                    <button type="button" class="toolbar-btn" data-command="redo" title="Redo (Ctrl+Y)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 7v6h-6"></path>
+                            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="toolbar-divider"></div>
+                
+                <div class="toolbar-group">
+                    <select class="toolbar-select" id="fontSizeSelect" title="Font Size">
+                        <option value="14px">14</option>
+                        <option value="16px" selected>16</option>
+                        <option value="18px">18</option>
+                        <option value="20px">20</option>
+                        <option value="24px">24</option>
+                        <option value="28px">28</option>
+                        <option value="32px">32</option>
+                    </select>
+                </div>
+                
+                <div class="toolbar-divider"></div>
+                
+                <div class="toolbar-group">
+                    <button type="button" class="toolbar-btn" data-command="bold" title="Bold (Ctrl+B)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+                            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+                        </svg>
+                    </button>
+                    <button type="button" class="toolbar-btn" data-command="italic" title="Italic (Ctrl+I)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="4" x2="10" y2="4"></line>
+                            <line x1="14" y1="20" x2="5" y2="20"></line>
+                            <line x1="15" y1="4" x2="9" y2="20"></line>
+                        </svg>
+                    </button>
+                    <button type="button" class="toolbar-btn" data-command="underline" title="Underline (Ctrl+U)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path>
+                            <line x1="4" y1="21" x2="20" y2="21"></line>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="toolbar-divider"></div>
+                
+                <div class="toolbar-group">
+                    <button type="button" class="toolbar-btn" data-command="justifyLeft" title="Align Left">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="17" y1="10" x2="3" y2="10"></line>
+                            <line x1="21" y1="6" x2="3" y2="6"></line>
+                            <line x1="21" y1="14" x2="3" y2="14"></line>
+                            <line x1="17" y1="18" x2="3" y2="18"></line>
+                        </svg>
+                    </button>
+                    <button type="button" class="toolbar-btn" data-command="justifyCenter" title="Align Center">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="10" x2="6" y2="10"></line>
+                            <line x1="21" y1="6" x2="3" y2="6"></line>
+                            <line x1="21" y1="14" x2="3" y2="14"></line>
+                            <line x1="18" y1="18" x2="6" y2="18"></line>
+                        </svg>
+                    </button>
+                    <button type="button" class="toolbar-btn" data-command="justifyRight" title="Align Right">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="21" y1="10" x2="7" y2="10"></line>
+                            <line x1="21" y1="6" x2="3" y2="6"></line>
+                            <line x1="21" y1="14" x2="3" y2="14"></line>
+                            <line x1="21" y1="18" x2="7" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="toolbar-divider"></div>
+                
+                <div class="toolbar-group output-toggle">
+                    <button type="button" class="toggle-btn active" data-output="gurmukhi">Gurmukhi</button>
+                    <button type="button" class="toggle-btn" data-output="roman">Roman</button>
+                    <button type="button" class="toggle-btn" data-output="both">Both</button>
+                </div>
+                
+                <div class="toolbar-spacer"></div>
+                
+                <div class="toolbar-group">
+                    <button type="button" class="toolbar-btn" id="clearEditorBtn" title="Clear Editor">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Editor Content Area -->
+            <div class="editor-content-wrapper">
+                <div 
+                    class="editor-content" 
+                    id="transcriptEditor" 
+                    contenteditable="true" 
+                    spellcheck="false"
+                    placeholder="Click 'Start Recording' to begin live transcription. Text will appear here and can be edited..."
+                ></div>
+            </div>
+            
+            <!-- Status Bar (Word-like) -->
+            <div class="editor-statusbar">
+                <div class="statusbar-left">
+                    <span class="statusbar-item" id="wordCount">Words: 0</span>
+                    <span class="statusbar-item" id="charCount">Characters: 0</span>
+                    <span class="statusbar-item" id="segmentCount">Segments: 0</span>
+                </div>
+                <div class="statusbar-right">
+                    <span class="statusbar-item recording-indicator" id="recordingIndicator" style="display: none;">
+                        <span class="recording-dot"></span>
+                        Recording
+                    </span>
+                    <span class="statusbar-item" id="lastUpdated"></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Download/Export Controls -->
+        <div class="export-controls" id="exportControls">
+            <select id="downloadFormat" class="export-select">
+                <option value="txt">Plain Text (.txt)</option>
+                <option value="html">Rich Text (.html)</option>
+                <option value="json">JSON (.json)</option>
+                <option value="markdown">Markdown (.md)</option>
+            </select>
+            <div class="translation-option">
+                <label class="translation-toggle" title="Include translation in download">
+                    <input type="checkbox" id="includeTranslation">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 8l6 6"></path>
+                        <path d="M4 14l6-6 2-3"></path>
+                        <path d="M2 5h12"></path>
+                        <path d="M22 22l-5-10-5 10"></path>
+                        <path d="M14 18h6"></path>
+                    </svg>
+                    <span>Translate</span>
+                </label>
+                <select id="targetLanguage" class="language-select" disabled>
+                    <option value="en">English</option>
+                    <option value="hi">Hindi</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                </select>
+            </div>
+            <button id="downloadBtn" class="btn-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download
+            </button>
+        </div>
+        
+        <!-- Segment Metadata Tooltip (shown on hover) -->
+        <div class="segment-tooltip" id="segmentTooltip" style="display: none;">
+            <div class="tooltip-header">
+                <span class="tooltip-title">Segment Details</span>
+                <span class="tooltip-confidence" id="tooltipConfidence">95%</span>
+            </div>
+            <div class="tooltip-content">
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Time:</span>
+                    <span class="tooltip-value" id="tooltipTime">0.0s - 5.0s</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Language:</span>
+                    <span class="tooltip-value" id="tooltipLanguage">Punjabi</span>
+                </div>
+                <div class="tooltip-row" id="tooltipQuoteRow" style="display: none;">
+                    <span class="tooltip-label">Quote:</span>
+                    <span class="tooltip-value" id="tooltipQuote"></span>
+                </div>
+                <div class="tooltip-row" id="tooltipSourceRow" style="display: none;">
+                    <span class="tooltip-label">Source:</span>
+                    <span class="tooltip-value" id="tooltipSource"></span>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block scripts %}
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='js/live.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/live-editor.js') }}"></script>
 {% endblock %}

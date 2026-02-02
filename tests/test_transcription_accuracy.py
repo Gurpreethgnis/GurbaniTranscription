@@ -523,38 +523,69 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
             delimiter = '\t' if metadata_file.suffix == '.tsv' else ','
             
             try:
-                # Check for Fairseq style sidecar files (e.g., train.tsv -> train.wrd)
+                # Check for Fairseq style sidecar files
                 transcript_file = None
-                for ext in ['.wrd', '.txt', '.ltr']:
+                # Check for basenames (train.tsv -> train.wrd)
+                for ext in ['.wrd', '.txt', '.ltr', '.transcript']:
                     sidecar = metadata_file.with_suffix(ext)
                     if sidecar.exists():
                         transcript_file = sidecar
                         break
                 
+                # If not found, look for ANY .wrd or .txt in the same directory if there's only one
+                if not transcript_file:
+                    alternatives = list(metadata_file.parent.glob('*.wrd')) + list(metadata_file.parent.glob('*.txt'))
+                    if len(alternatives) == 1:
+                        transcript_file = alternatives[0]
+
                 with open(metadata_file, 'r', encoding='utf-8') as f:
-                    # Skip header if it's a Fairseq manifest (usually first line is a path)
-                    first_line = f.readline()
+                    # Fairseq manifest detection: Line 1 is a directory path
+                    first_line = f.readline().strip()
                     f.seek(0)
                     
-                    if delimiter == '\t' and '/' in first_line and not any(h in first_line.lower() for h in ['path', 'audio', 'file']):
-                        # This looks like a Fairseq manifest (Line 1 = root_path)
-                        root_path = Path(first_line.strip())
+                    # Detect Fairseq: delimiter is \t, first line has / or \, and no headers
+                    is_fairseq = (
+                        delimiter == '\t' and 
+                        ('/' in first_line or '\\' in first_line) and 
+                        not any(h in first_line.lower() for h in ['path', 'audio', 'file'])
+                    )
+
+                    if is_fairseq:
+                        logger.info(f"Detected Fairseq manifest: {metadata_file}")
+                        # Root path provided in the manifest (first line)
+                        manifest_root = Path(first_line)
                         lines = f.readlines()[1:] # Skip root path line
                         
                         if transcript_file:
+                            logger.info(f"Using transcription file: {transcript_file}")
                             with open(transcript_file, 'r', encoding='utf-8') as tf:
-                                transcripts = tf.readlines()
+                                transcripts = [l.strip() for l in tf.readlines()]
                             
                             for i, line in enumerate(lines):
                                 if len(samples) >= num_samples: break
                                 parts = line.split('\t')
                                 rel_path = parts[0]
-                                audio_path = dataset_path / rel_path
-                                if not audio_path.exists():
-                                    audio_path = root_path / rel_path
                                 
-                                if audio_path.exists() and i < len(transcripts):
-                                    samples.append((audio_path, transcripts[i].strip()))
+                                # Try multiple resolutions for audio
+                                pts = [
+                                    manifest_root / rel_path,
+                                    dataset_path / rel_path,
+                                    metadata_file.parent / rel_path,
+                                    dataset_path / "Audio files" / Path(rel_path).name,
+                                ]
+                                
+                                # Add extensions if missing
+                                if not any(rel_path.endswith(ext) for ext in audio_extensions):
+                                    for ext in audio_extensions:
+                                        pts.extend([p.with_suffix(ext) for p in pts if p.suffix == ""])
+
+                                for audio_path in pts:
+                                    if audio_path.exists() and audio_path.is_file():
+                                        if i < len(transcripts):
+                                            samples.append((audio_path, transcripts[i]))
+                                            break
+                        else:
+                            logger.warning(f"Found Fairseq manifest but no transcription file for {metadata_file}")
                         continue
 
                     # Regular CSV/TSV processing

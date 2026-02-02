@@ -74,6 +74,8 @@ def calculate_wer(reference: str, hypothesis: str) -> float:
         t = re.sub(r'^\d+[\s,.:|_-]+', '', t.strip())
         # Remove trailing numbers
         t = re.sub(r'[\s,.:|_-]+\d+$', '', t)
+        # Remove punctuation
+        t = re.sub(r'[^\w\s]', '', t)
         return t.lower()
 
     ref_words = clean_text(reference).split()
@@ -115,7 +117,9 @@ def calculate_cer(reference: str, hypothesis: str) -> float:
         t = re.sub(r'^\d+[\s,.:|_-]+', '', t.strip())
         # Remove trailing numbers
         t = re.sub(r'[\s,.:|_-]+\d+$', '', t)
-        return t.lower().replace(" ", "")
+        # Remove punctuation
+        t = re.sub(r'[^\w\s]', '', t)
+        return t.lower()
 
     ref_chars = list(clean_text(reference))
     hyp_chars = list(clean_text(hypothesis))
@@ -188,7 +192,9 @@ def generate_tts_audio(text: str, language: str = "pa", output_path: Optional[Pa
 def transcribe_with_options(
     audio_path: Path,
     enable_denoising: bool = False,
-    denoise_strength: str = "medium"
+    denoise_strength: str = "medium",
+    domain_mode: Optional[str] = None,
+    strict_gurmukhi: bool = True
 ) -> Tuple[str, dict]:
     """
     Transcribe audio file with configurable options.
@@ -197,6 +203,8 @@ def transcribe_with_options(
         audio_path: Path to audio file
         enable_denoising: Whether to enable audio denoising
         denoise_strength: Denoising strength (light, medium, aggressive)
+        domain_mode: Domain mode (sggs, general, dasam)
+        strict_gurmukhi: Whether to enforce strict Gurmukhi
         
     Returns:
         Tuple of (transcribed_text, metrics_dict)
@@ -219,7 +227,9 @@ def transcribe_with_options(
     result = orch.transcribe_file(
         audio_path,
         mode="batch",
-        processing_options=processing_options
+        processing_options=processing_options,
+        domain_mode=domain_mode,
+        strict_gurmukhi=strict_gurmukhi
     )
     
     # Extract text (prefer gurmukhi, fall back to segment text)
@@ -704,7 +714,13 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
     return samples[:num_samples]
 
 
-def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False, manual_path: Optional[Path] = None) -> List[AccuracyResult]:
+def run_kaggle_benchmark(
+    num_samples: int = 10, 
+    enable_denoising: bool = False, 
+    manual_path: Optional[Path] = None,
+    domain_mode: Optional[str] = "general",
+    strict_gurmukhi: bool = False
+) -> List[AccuracyResult]:
     """
     Run accuracy benchmark using Kaggle Punjabi Speech dataset.
     
@@ -712,6 +728,8 @@ def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False, 
         num_samples: Number of samples to test
         enable_denoising: Whether to enable denoising
         manual_path: Optional manual path to dataset
+        domain_mode: Domain mode (default: general for Kaggle)
+        strict_gurmukhi: Enforce strict Gurmukhi (default: False for Kaggle)
         
     Returns:
         List of AccuracyResult
@@ -735,6 +753,7 @@ def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False, 
     print(f"\n{'='*60}")
     print(f"Running Kaggle Punjabi Speech Accuracy Benchmark")
     print(f"Samples: {len(samples)} | Denoising: {'ENABLED' if enable_denoising else 'DISABLED'}")
+    print(f"Domain: {domain_mode} | Strict Gurmukhi: {strict_gurmukhi}")
     print(f"{'='*60}\n")
     
     results = []
@@ -752,7 +771,9 @@ def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False, 
             result = orch.transcribe_file(
                 audio_path,
                 mode="batch",
-                processing_options=processing_options
+                processing_options=processing_options,
+                domain_mode=domain_mode,
+                strict_gurmukhi=strict_gurmukhi
             )
             
             # Get transcribed text
@@ -824,6 +845,8 @@ if __name__ == "__main__":
     parser.add_argument("--kaggle", action="store_true", help="Use Kaggle Punjabi dataset (requires kagglehub)")
     parser.add_argument("--kaggle-path", type=str, help="Manual path to Kaggle dataset root")
     parser.add_argument("--kaggle-samples", type=int, default=10, help="Number of Kaggle samples to test")
+    parser.add_argument("--domain", type=str, choices=["sggs", "general", "dasam"], default=None, help="Domain mode for transcription")
+    parser.add_argument("--strict-gurmukhi", action="store_true", help="Enforce strict Gurmukhi output")
     args = parser.parse_args()
     
     if args.unittest:
@@ -831,10 +854,14 @@ if __name__ == "__main__":
     elif args.kaggle:
         # Run with Kaggle dataset
         path = Path(args.kaggle_path) if args.kaggle_path else None
+        # For Kaggle, default to 'general' domain and no strict gurmukhi if not specified
+        domain = args.domain or "general"
         run_kaggle_benchmark(
             num_samples=args.kaggle_samples, 
             enable_denoising=args.denoise,
-            manual_path=path
+            manual_path=path,
+            domain_mode=domain,
+            strict_gurmukhi=args.strict_gurmukhi
         )
     else:
         # Run full TTS benchmark

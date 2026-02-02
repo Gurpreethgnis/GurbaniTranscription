@@ -718,7 +718,7 @@ def run_kaggle_benchmark(
     num_samples: int = 10, 
     enable_denoising: bool = False, 
     manual_path: Optional[Path] = None,
-    domain_mode: Optional[str] = "general",
+    domain_mode: Optional[str] = "generic",
     strict_gurmukhi: bool = False
 ) -> List[AccuracyResult]:
     """
@@ -728,7 +728,7 @@ def run_kaggle_benchmark(
         num_samples: Number of samples to test
         enable_denoising: Whether to enable denoising
         manual_path: Optional manual path to dataset
-        domain_mode: Domain mode (default: general for Kaggle)
+        domain_mode: Domain mode (default: generic for Kaggle)
         strict_gurmukhi: Enforce strict Gurmukhi (default: False for Kaggle)
         
     Returns:
@@ -845,7 +845,7 @@ if __name__ == "__main__":
     parser.add_argument("--kaggle", action="store_true", help="Use Kaggle Punjabi dataset (requires kagglehub)")
     parser.add_argument("--kaggle-path", type=str, help="Manual path to Kaggle dataset root")
     parser.add_argument("--kaggle-samples", type=int, default=10, help="Number of Kaggle samples to test")
-    parser.add_argument("--domain", type=str, choices=["sggs", "general", "dasam"], default=None, help="Domain mode for transcription")
+    parser.add_argument("--domain", type=str, choices=["sggs", "generic", "dasam"], default=None, help="Domain mode for transcription")
     parser.add_argument("--strict-gurmukhi", action="store_true", help="Enforce strict Gurmukhi output")
     args = parser.parse_args()
     
@@ -854,8 +854,8 @@ if __name__ == "__main__":
     elif args.kaggle:
         # Run with Kaggle dataset
         path = Path(args.kaggle_path) if args.kaggle_path else None
-        # For Kaggle, default to 'general' domain and no strict gurmukhi if not specified
-        domain = args.domain or "general"
+        # For Kaggle, default to 'generic' domain and no strict gurmukhi if not specified
+        domain = args.domain or "generic"
         run_kaggle_benchmark(
             num_samples=args.kaggle_samples, 
             enable_denoising=args.denoise,

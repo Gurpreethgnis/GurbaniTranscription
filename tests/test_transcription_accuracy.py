@@ -554,12 +554,15 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
                         logger.info(f"Detected Fairseq manifest: {metadata_file}")
                         # Root path provided in the manifest (first line)
                         manifest_root = Path(first_line)
+                        logger.info(f"Manifest root line: '{first_line}'")
                         lines = f.readlines()[1:] # Skip root path line
                         
                         if transcript_file:
                             logger.info(f"Using transcription file: {transcript_file}")
                             with open(transcript_file, 'r', encoding='utf-8') as tf:
                                 transcripts = [l.strip() for l in tf.readlines()]
+                            
+                            logger.info(f"Loaded {len(transcripts)} transcripts and {len(lines)} audio entries")
                             
                             for i, line in enumerate(lines):
                                 if len(samples) >= num_samples: break
@@ -571,7 +574,9 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
                                     manifest_root / rel_path,
                                     dataset_path / rel_path,
                                     metadata_file.parent / rel_path,
+                                    # Very aggressive: search for just the filename in known audio dirs
                                     dataset_path / "Audio files" / Path(rel_path).name,
+                                    dataset_path / "Audio files" / rel_path,
                                 ]
                                 
                                 # Add extensions if missing
@@ -579,11 +584,18 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
                                     for ext in audio_extensions:
                                         pts.extend([p.with_suffix(ext) for p in pts if p.suffix == ""])
 
+                                found_path = False
                                 for audio_path in pts:
                                     if audio_path.exists() and audio_path.is_file():
                                         if i < len(transcripts):
                                             samples.append((audio_path, transcripts[i]))
+                                            found_path = True
                                             break
+                                
+                                if not found_path and i < 2: # Debug first 2 failures
+                                    logger.info(f"  Debug: Could not find audio for '{rel_path}'")
+                                    logger.info(f"  Tried e.g.: {pts[0]}")
+                                    logger.info(f"  Tried e.g.: {pts[3]}")
                         else:
                             logger.warning(f"Found Fairseq manifest but no transcription file for {metadata_file}")
                         continue

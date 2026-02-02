@@ -438,27 +438,6 @@ def run_full_benchmark(enable_denoising: bool = False):
     return results
 
 
-if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Run transcription accuracy tests")
-    parser.add_argument("--denoise", action="store_true", help="Enable denoising")
-    parser.add_argument("--unittest", action="store_true", help="Run as unittest suite")
-    parser.add_argument("--kaggle", action="store_true", help="Use Kaggle Punjabi dataset (requires kagglehub)")
-    parser.add_argument("--kaggle-samples", type=int, default=10, help="Number of Kaggle samples to test")
-    args = parser.parse_args()
-    
-    if args.unittest:
-        unittest.main(argv=[''], exit=False, verbosity=2)
-    elif args.kaggle:
-        # Run with Kaggle dataset
-        run_kaggle_benchmark(
-            num_samples=args.kaggle_samples, 
-            enable_denoising=args.denoise
-        )
-    else:
-        # Run full TTS benchmark
-        run_full_benchmark(enable_denoising=args.denoise)
 
 
 # =============================================================================
@@ -664,4 +643,27 @@ def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False) 
     print(f"{'='*60}\n")
     
     return results
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Run transcription accuracy tests")
+    parser.add_argument("--denoise", action="store_true", help="Enable denoising")
+    parser.add_argument("--unittest", action="store_true", help="Run as unittest suite")
+    parser.add_argument("--kaggle", action="store_true", help="Use Kaggle Punjabi dataset (requires kagglehub)")
+    parser.add_argument("--kaggle-samples", type=int, default=10, help="Number of Kaggle samples to test")
+    args = parser.parse_args()
+    
+    if args.unittest:
+        unittest.main(argv=[''], exit=False, verbosity=2)
+    elif args.kaggle:
+        # Run with Kaggle dataset
+        run_kaggle_benchmark(
+            num_samples=args.kaggle_samples, 
+            enable_denoising=args.denoise
+        )
+    else:
+        # Run full TTS benchmark
+        run_full_benchmark(enable_denoising=args.denoise)
 

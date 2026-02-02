@@ -444,17 +444,25 @@ def run_full_benchmark(enable_denoising: bool = False):
 # Kaggle Punjabi Speech Recognition Dataset Support
 # =============================================================================
 
-def download_kaggle_dataset() -> Path:
+def download_kaggle_dataset(manual_path: Optional[Path] = None) -> Path:
     """
-    Download the Kaggle Punjabi Speech Recognition dataset.
+    Download the Kaggle Punjabi Speech Recognition dataset or use manual path.
     
+    Args:
+        manual_path: Optional manual path to dataset
+        
     Returns:
-        Path to downloaded dataset directory
+        Path to dataset directory
     """
+    if manual_path:
+        if not manual_path.exists():
+            raise FileNotFoundError(f"Manual Kaggle path does not exist: {manual_path}")
+        return manual_path
+
     try:
         import kagglehub
     except ImportError:
-        raise ImportError("kagglehub not installed. Install with: pip install kagglehub")
+        raise ImportError("kagglehub not installed and no manual path provided. Install with: pip install kagglehub")
     
     print("Downloading Kaggle Punjabi Speech Recognition dataset...")
     path = kagglehub.dataset_download("warcoder/punjabi-speech-recognition")
@@ -530,7 +538,8 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
                                 metadata_file.parent / val,
                                 dataset_path / val,
                                 dataset_path / "audio" / val,
-                                dataset_path / "punjabi" / val
+                                dataset_path / "punjabi" / val,
+                                dataset_path / "Audio files" / val, # Added based on user output
                             ]
                             
                             # Add extensions if missing
@@ -562,36 +571,48 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
                 if text_file.exists():
                     with open(text_file, 'r', encoding='utf-8') as f:
                         samples.append((audio_file, f.read().strip()))
+                else:
+                    # Look for ANY .txt in the same directory if there's only one
+                    txt_files = list(audio_file.parent.glob('*.txt'))
+                    if len(txt_files) == 1:
+                        with open(txt_files[0], 'r', encoding='utf-8') as f:
+                            samples.append((audio_file, f.read().strip()))
+
             if samples: break
 
     if not samples:
         logger.warning(f"No audio-transcription pairs found in {dataset_path}")
         # Help user debug by listing some files
         print(f"\nDebug - Files found in {dataset_path}:")
-        all_files = list(dataset_path.rglob('*'))
-        for item in all_files[:30]:
-            print(f"  {item.relative_to(dataset_path)}")
-        if len(all_files) > 30:
-            print(f"  ... and {len(all_files)-30} more")
+        all_items = list(dataset_path.iterdir())
+        for item in all_items[:20]:
+            print(f"  {item.name} ({'dir' if item.is_dir() else 'file'})")
+        if len(all_items) > 20:
+            print(f"  ... and {len(all_items)-20} more")
     
     return samples[:num_samples]
 
 
-def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False) -> List[AccuracyResult]:
+def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False, manual_path: Optional[Path] = None) -> List[AccuracyResult]:
     """
     Run accuracy benchmark using Kaggle Punjabi Speech dataset.
     
     Args:
         num_samples: Number of samples to test
         enable_denoising: Whether to enable denoising
+        manual_path: Optional manual path to dataset
         
     Returns:
         List of AccuracyResult
     """
     from core.orchestrator import Orchestrator
     
-    # Download dataset if needed
-    dataset_path = download_kaggle_dataset()
+    # Download dataset or use manual path
+    try:
+        dataset_path = download_kaggle_dataset(manual_path)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        return []
     
     # Load samples
     samples = load_kaggle_samples(dataset_path, num_samples)
@@ -690,6 +711,7 @@ if __name__ == "__main__":
     parser.add_argument("--denoise", action="store_true", help="Enable denoising")
     parser.add_argument("--unittest", action="store_true", help="Run as unittest suite")
     parser.add_argument("--kaggle", action="store_true", help="Use Kaggle Punjabi dataset (requires kagglehub)")
+    parser.add_argument("--kaggle-path", type=str, help="Manual path to Kaggle dataset root")
     parser.add_argument("--kaggle-samples", type=int, default=10, help="Number of Kaggle samples to test")
     args = parser.parse_args()
     
@@ -697,9 +719,11 @@ if __name__ == "__main__":
         unittest.main(argv=[''], exit=False, verbosity=2)
     elif args.kaggle:
         # Run with Kaggle dataset
+        path = Path(args.kaggle_path) if args.kaggle_path else None
         run_kaggle_benchmark(
             num_samples=args.kaggle_samples, 
-            enable_denoising=args.denoise
+            enable_denoising=args.denoise,
+            manual_path=path
         )
     else:
         # Run full TTS benchmark

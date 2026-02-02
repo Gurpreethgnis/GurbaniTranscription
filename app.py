@@ -1024,12 +1024,18 @@ def save_settings():
         # Don't save sensitive data like API keys in plain text
         safe_data = data.copy()
         if 'commercial' in safe_data and 'apiKey' in safe_data['commercial']:
-            # Store API key securely (in env var or encrypted file)
             api_key = safe_data['commercial'].get('apiKey', '')
             if api_key:
-                # For now, just mask it in saved file
+                # Update runtime config
+                config.COMMERCIAL_API_KEY = api_key
+                config.USE_COMMERCIAL = True
+                
+                # Mask it in saved file
                 safe_data['commercial']['apiKey'] = '***masked***'
-                # Could also update environment or secure storage here
+                
+                # Refresh provider registry availability
+                from asr.provider_registry import get_registry
+                get_registry().refresh_availability()
         
         with open(settings_file, 'w', encoding='utf-8') as f:
             json_lib.dump(safe_data, f, indent=2)
@@ -1118,10 +1124,18 @@ def test_commercial_api():
         
         # Test connection
         if provider.check_api_health():
+            # Success! Update runtime config temporarily to allow selection
+            config.COMMERCIAL_API_KEY = api_key
+            config.USE_COMMERCIAL = True
+            
+            # Refresh provider registry availability
+            from asr.provider_registry import get_registry
+            get_registry().refresh_availability()
+            
             quota = provider.get_remaining_quota()
             return jsonify({
                 "success": True,
-                "message": "Connection successful",
+                "message": "Connection successful. Commercial provider is now enabled.",
                 "quota": quota
             })
         else:

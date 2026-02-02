@@ -67,11 +67,17 @@ class AccuracyResult:
 def calculate_wer(reference: str, hypothesis: str) -> float:
     """
     Calculate Word Error Rate (WER) using Levenshtein distance.
-    
-    WER = (substitutions + deletions + insertions) / total_reference_words
     """
-    ref_words = reference.lower().split()
-    hyp_words = hypothesis.lower().split()
+    import re
+    def clean_text(t: str) -> str:
+        # Remove leading numbers and punctuation (e.g., "92, ")
+        t = re.sub(r'^\d+[\s,.:|_-]+', '', t.strip())
+        # Remove trailing numbers
+        t = re.sub(r'[\s,.:|_-]+\d+$', '', t)
+        return t.lower()
+
+    ref_words = clean_text(reference).split()
+    hyp_words = clean_text(hypothesis).split()
     
     if len(ref_words) == 0:
         return 0.0 if len(hyp_words) == 0 else 1.0
@@ -101,11 +107,18 @@ def calculate_wer(reference: str, hypothesis: str) -> float:
 def calculate_cer(reference: str, hypothesis: str) -> float:
     """
     Calculate Character Error Rate (CER) using Levenshtein distance.
-    
-    CER = (substitutions + deletions + insertions) / total_reference_chars
     """
-    ref_chars = list(reference.lower().replace(" ", ""))
-    hyp_chars = list(hypothesis.lower().replace(" ", ""))
+    # Clean text to remove common metadata markers like "92, " or "sent_1: "
+    import re
+    def clean_text(t: str) -> str:
+        # Remove leading numbers and punctuation (e.g., "92, ")
+        t = re.sub(r'^\d+[\s,.:|_-]+', '', t.strip())
+        # Remove trailing numbers
+        t = re.sub(r'[\s,.:|_-]+\d+$', '', t)
+        return t.lower().replace(" ", "")
+
+    ref_chars = list(clean_text(reference))
+    hyp_chars = list(clean_text(hypothesis))
     
     if len(ref_chars) == 0:
         return 0.0 if len(hyp_chars) == 0 else 1.0
@@ -491,6 +504,7 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
 
     samples = []
     audio_extensions = ['.wav', '.mp3', '.flac', '.ogg']
+    transcript_extensions = ['.txt', '.wrd', '.lab', '.transcript']
     
     # Recursively find ALL CSV/TSV files in the dataset
     metadata_files = list(dataset_path.rglob('*.csv')) + list(dataset_path.rglob('*.tsv'))
@@ -509,7 +523,41 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
             delimiter = '\t' if metadata_file.suffix == '.tsv' else ','
             
             try:
+                # Check for Fairseq style sidecar files (e.g., train.tsv -> train.wrd)
+                transcript_file = None
+                for ext in ['.wrd', '.txt', '.ltr']:
+                    sidecar = metadata_file.with_suffix(ext)
+                    if sidecar.exists():
+                        transcript_file = sidecar
+                        break
+                
                 with open(metadata_file, 'r', encoding='utf-8') as f:
+                    # Skip header if it's a Fairseq manifest (usually first line is a path)
+                    first_line = f.readline()
+                    f.seek(0)
+                    
+                    if delimiter == '\t' and '/' in first_line and not any(h in first_line.lower() for h in ['path', 'audio', 'file']):
+                        # This looks like a Fairseq manifest (Line 1 = root_path)
+                        root_path = Path(first_line.strip())
+                        lines = f.readlines()[1:] # Skip root path line
+                        
+                        if transcript_file:
+                            with open(transcript_file, 'r', encoding='utf-8') as tf:
+                                transcripts = tf.readlines()
+                            
+                            for i, line in enumerate(lines):
+                                if len(samples) >= num_samples: break
+                                parts = line.split('\t')
+                                rel_path = parts[0]
+                                audio_path = dataset_path / rel_path
+                                if not audio_path.exists():
+                                    audio_path = root_path / rel_path
+                                
+                                if audio_path.exists() and i < len(transcripts):
+                                    samples.append((audio_path, transcripts[i].strip()))
+                        continue
+
+                    # Regular CSV/TSV processing
                     reader = csv.DictReader(f, delimiter=delimiter)
                     
                     for i, row in enumerate(reader):
@@ -539,7 +587,7 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
                                 dataset_path / val,
                                 dataset_path / "audio" / val,
                                 dataset_path / "punjabi" / val,
-                                dataset_path / "Audio files" / val, # Added based on user output
+                                dataset_path / "Audio files" / val,
                             ]
                             
                             # Add extensions if missing
@@ -558,7 +606,7 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
             if len(samples) >= num_samples:
                 break
     
-    # Fallback: Search for paired .txt and audio files recursively
+    # Fallback: Search for paired .txt/wrd and audio files recursively
     if not samples:
         logger.info("Falling back to recursive paired file search")
         for ext in audio_extensions:
@@ -566,17 +614,37 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
             for audio_file in audio_files:
                 if len(samples) >= num_samples:
                     break
-                # Check for .txt in same dir or with same name
-                text_file = audio_file.with_suffix('.txt')
-                if text_file.exists():
-                    with open(text_file, 'r', encoding='utf-8') as f:
-                        samples.append((audio_file, f.read().strip()))
-                else:
-                    # Look for ANY .txt in the same directory if there's only one
-                    txt_files = list(audio_file.parent.glob('*.txt'))
-                    if len(txt_files) == 1:
+                
+                # Try specific transcript extensions with same basename
+                found_match = False
+                for t_ext in transcript_extensions:
+                    text_file = audio_file.with_suffix(t_ext)
+                    if text_file.exists():
+                        with open(text_file, 'r', encoding='utf-8') as f:
+                            samples.append((audio_file, f.read().strip()))
+                        found_match = True
+                        break
+                
+                if found_match: continue
+
+                # Look for ONE transcript file in the same directory that might be a manifest
+                # But only if it has a sensible name (e.g., matching the directory)
+                txt_files = []
+                for t_ext in transcript_extensions:
+                    txt_files.extend(list(audio_file.parent.glob(f'*{t_ext}')))
+                
+                if len(txt_files) == 1:
+                    # Check if the filename contains the audio filename
+                    if audio_file.stem in txt_files[0].stem or txt_files[0].stem in audio_file.stem:
                         with open(txt_files[0], 'r', encoding='utf-8') as f:
                             samples.append((audio_file, f.read().strip()))
+                    else:
+                        # Possibly a shared manifest for the directory. 
+                        # Only use it if it's the only one AND it's not huge
+                        with open(txt_files[0], 'r', encoding='utf-8') as f:
+                            content = f.read().strip()
+                            if len(content.splitlines()) < 2: # Only if it's a single line
+                                samples.append((audio_file, content))
 
             if samples: break
 

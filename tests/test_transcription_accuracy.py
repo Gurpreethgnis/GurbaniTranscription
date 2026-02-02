@@ -474,69 +474,107 @@ def load_kaggle_samples(dataset_path: Path, num_samples: int = 10) -> List[Tuple
     Returns:
         List of (audio_path, expected_transcription) tuples
     """
+    # If the directory contains exactly one subdirectory, dive into it
+    # This handles nested structures like 'versions/1/punjabi/'
+    subdirs = [d for d in dataset_path.iterdir() if d.is_dir()]
+    if len(subdirs) == 1 and not (dataset_path / "metadata.csv").exists():
+        logger.info(f"Diving into subdirectory: {subdirs[0].name}")
+        dataset_path = subdirs[0]
+
     samples = []
-    
-    # Look for common dataset structures
-    # Try to find audio files and corresponding transcriptions
     audio_extensions = ['.wav', '.mp3', '.flac', '.ogg']
     
-    # Check for a CSV/TSV file with transcriptions
-    metadata_files = list(dataset_path.glob('*.csv')) + list(dataset_path.glob('*.tsv'))
+    # Recursively find ALL CSV/TSV files in the dataset
+    metadata_files = list(dataset_path.rglob('*.csv')) + list(dataset_path.rglob('*.tsv'))
+    logger.info(f"Found {len(metadata_files)} metadata files recursively")
     
     if metadata_files:
-        # Use metadata file to map audio to transcriptions
-        metadata_file = metadata_files[0]
-        delimiter = '\t' if metadata_file.suffix == '.tsv' else ','
+        # Sort to prioritize certain names
+        metadata_files.sort(key=lambda p: (
+            0 if "metadata" in p.name.lower() else 
+            1 if "train" in p.name.lower() else 
+            2 if "test" in p.name.lower() else 3
+        ))
         
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter=delimiter)
+        for metadata_file in metadata_files:
+            logger.info(f"Trying metadata file: {metadata_file}")
+            delimiter = '\t' if metadata_file.suffix == '.tsv' else ','
             
-            for i, row in enumerate(reader):
-                if i >= num_samples:
-                    break
-                
-                # Common column names for audio path
-                audio_col = None
-                for col in ['path', 'audio', 'file', 'filename', 'audio_path']:
-                    if col in row:
-                        audio_col = col
-                        break
-                
-                # Common column names for transcription
-                text_col = None
-                for col in ['sentence', 'text', 'transcript', 'transcription', 'label']:
-                    if col in row:
-                        text_col = col
-                        break
-                
-                if audio_col and text_col:
-                    audio_path = dataset_path / row[audio_col]
-                    if audio_path.exists():
-                        samples.append((audio_path, row[text_col]))
-    else:
-        # No metadata file, try to find paired files
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f, delimiter=delimiter)
+                    
+                    for i, row in enumerate(reader):
+                        if len(samples) >= num_samples:
+                            break
+                        
+                        # Find audio column
+                        audio_col = None
+                        for col in ['path', 'audio', 'file', 'filename', 'audio_path', 'audio_id', 'id']:
+                            if col in row:
+                                audio_col = col
+                                break
+                        
+                        # Find text column
+                        text_col = None
+                        for col in ['sentence', 'text', 'transcript', 'transcription', 'label', 'punjabi', 'gurmukhi']:
+                            if col in row:
+                                text_col = col
+                                break
+                        
+                        if audio_col and text_col:
+                            # Try different path resolutions for audio
+                            val = row[audio_col]
+                            # Possible paths: relative to CSV, relative to dataset root, or just filename
+                            potential_paths = [
+                                metadata_file.parent / val,
+                                dataset_path / val,
+                                dataset_path / "audio" / val,
+                                dataset_path / "punjabi" / val
+                            ]
+                            
+                            # Add extensions if missing
+                            if not any(val.endswith(ext) for ext in audio_extensions):
+                                for ext in audio_extensions:
+                                    potential_paths.extend([p.with_suffix(ext) for p in potential_paths if p.suffix == ""])
+
+                            for audio_path in potential_paths:
+                                if audio_path.exists() and audio_path.is_file():
+                                    samples.append((audio_path, row[text_col]))
+                                    break
+            except Exception as e:
+                logger.warning(f"Error reading {metadata_file}: {e}")
+                continue
+            
+            if len(samples) >= num_samples:
+                break
+    
+    # Fallback: Search for paired .txt and audio files recursively
+    if not samples:
+        logger.info("Falling back to recursive paired file search")
         for ext in audio_extensions:
-            audio_files = list(dataset_path.rglob(f'*{ext}'))[:num_samples]
-            
+            audio_files = list(dataset_path.rglob(f'*{ext}'))[:num_samples*2]
             for audio_file in audio_files:
-                # Look for corresponding text file
+                if len(samples) >= num_samples:
+                    break
+                # Check for .txt in same dir or with same name
                 text_file = audio_file.with_suffix('.txt')
                 if text_file.exists():
                     with open(text_file, 'r', encoding='utf-8') as f:
-                        transcription = f.read().strip()
-                    samples.append((audio_file, transcription))
-            
-            if samples:
-                break
-    
+                        samples.append((audio_file, f.read().strip()))
+            if samples: break
+
     if not samples:
         logger.warning(f"No audio-transcription pairs found in {dataset_path}")
-        # List what's in the directory to help debug
-        print(f"\nDirectory contents of {dataset_path}:")
-        for item in list(dataset_path.iterdir())[:20]:
-            print(f"  {item.name}")
+        # Help user debug by listing some files
+        print(f"\nDebug - Files found in {dataset_path}:")
+        all_files = list(dataset_path.rglob('*'))
+        for item in all_files[:30]:
+            print(f"  {item.relative_to(dataset_path)}")
+        if len(all_files) > 30:
+            print(f"  ... and {len(all_files)-30} more")
     
-    return samples
+    return samples[:num_samples]
 
 
 def run_kaggle_benchmark(num_samples: int = 10, enable_denoising: bool = False) -> List[AccuracyResult]:
